@@ -94,7 +94,12 @@ def search_similar_chunks(
     embedding = model.encode([question], convert_to_numpy=True)[0].tolist()
 
     # Retrieve more candidates if reranking is enabled
-    limit = retrieve_k if reranker else top_k
+    # For reranking: retrieve at least top_k, or 20% more than top_k for better reranking margin
+    # For small top_k values, use retrieve_k (20) to ensure enough candidates for reranking
+    if reranker:
+        limit = max(retrieve_k, int(top_k * 1.2))
+    else:
+        limit = top_k
     
     print(f"[search_similar_chunks] top_k={top_k}, limit={limit}, reranker={'enabled' if reranker else 'disabled'}")
     
@@ -158,7 +163,8 @@ def query_loop(
         else:
             print(f"Loading reranker model ({RERANKER_MODEL})...")
             reranker = CrossEncoder(RERANKER_MODEL)
-            print("✓ Reranking enabled (retrieves top-20, reranks to top-K)\n")
+            retrieve_count = max(DEFAULT_RETRIEVE_K, int(top_k * 1.2))
+            print(f"✓ Reranking enabled (retrieves {retrieve_count} candidates, reranks to top-{top_k})\n")
 
     mode = " (with reranking)" if reranker else ""
     print(f"\nRAG system ready{mode}. Collection: '{collection_name}' | Top-K: {top_k}")

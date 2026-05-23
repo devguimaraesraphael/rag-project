@@ -421,6 +421,88 @@
           transform: rotate(360deg);
         }
       }
+
+      /* ── Progress Log ── */
+      #progress-log {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #1a1d2e;
+        border: 2px solid #2d3148;
+        border-radius: 12px;
+        padding: 1.5rem;
+        min-width: 400px;
+        max-width: 500px;
+        z-index: 1000;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+        display: none;
+      }
+      #progress-log.show {
+        display: block;
+        animation: fadein 0.3s;
+      }
+      #progress-log-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #e2e8f0;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      #progress-log-content {
+        max-height: 300px;
+        overflow-y: auto;
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+      .log-entry {
+        padding: 0.5rem;
+        margin-bottom: 0.25rem;
+        border-left: 3px solid transparent;
+        color: #94a3b8;
+        animation: slideIn 0.2s;
+      }
+      .log-entry.info {
+        border-color: #3b82f6;
+        color: #93c5fd;
+      }
+      .log-entry.success {
+        border-color: #10b981;
+        color: #86efac;
+      }
+      .log-entry.error {
+        border-color: #ef4444;
+        color: #fca5a5;
+      }
+      .log-entry.processing {
+        border-color: #f59e0b;
+        color: #fcd34d;
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+      #progress-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 999;
+        display: none;
+      }
+      #progress-overlay.show {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -554,16 +636,18 @@
         <div>
           <div class="section-title">Search Settings</div>
           <label>Top-K Chunks</label>
-          <input 
-            type="number" 
-            id="top-k" 
-            value="5" 
-            min="1" 
+          <input
+            type="number"
+            id="top-k"
+            value="5"
+            min="1"
             max="100"
             step="1"
-            oninput="this.value = Math.max(1, Math.min(100, parseInt(this.value) || 5))"
+            oninput="
+              this.value = Math.max(1, Math.min(100, parseInt(this.value) || 5))
+            "
           />
-          <p style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">
+          <p style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem">
             Number of chunks to return (1-100)
           </p>
 
@@ -635,6 +719,16 @@
 
     <div id="toast"></div>
 
+    <!-- Progress Log Overlay -->
+    <div id="progress-overlay"></div>
+    <div id="progress-log">
+      <div id="progress-log-title">
+        <span class="spinner" style="display: inline-block"></span>
+        <span id="progress-log-title-text">Processing...</span>
+      </div>
+      <div id="progress-log-content"></div>
+    </div>
+
     <script>
       let activeCollection = "documents";
 
@@ -645,6 +739,41 @@
         el.className = `show ${type}`;
         clearTimeout(el._t);
         el._t = setTimeout(() => el.classList.remove("show"), duration);
+      }
+
+      // ── Progress Log ────────────────────────────────────────
+      function showProgressLog(title) {
+        document.getElementById("progress-log-title-text").textContent = title;
+        document.getElementById("progress-log-content").innerHTML = "";
+        document.getElementById("progress-overlay").classList.add("show");
+        document.getElementById("progress-log").classList.add("show");
+      }
+
+      function hideProgressLog() {
+        document.getElementById("progress-overlay").classList.remove("show");
+        document.getElementById("progress-log").classList.remove("show");
+      }
+
+      function addProgressLog(message, type = "info") {
+        const content = document.getElementById("progress-log-content");
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${type}`;
+
+        // Add timestamp
+        const now = new Date();
+        const time = now.toLocaleTimeString("en-US", {
+          hour12: false,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          fractionalSecondDigits: 1,
+        });
+
+        entry.innerHTML = `<span style="color:#64748b;font-size:0.75rem">[${time}]</span> ${message}`;
+        content.appendChild(entry);
+
+        // Auto-scroll to bottom
+        content.scrollTop = content.scrollHeight;
       }
 
       // ── Collections ─────────────────────────────────────────
@@ -753,8 +882,12 @@
           return;
         }
 
+        const file = fileInput.files[0];
+        const fileName = file.name;
+        const fileSize = (file.size / 1024 / 1024).toFixed(2); // MB
+
         const formData = new FormData();
-        formData.append("file", fileInput.files[0]);
+        formData.append("file", file);
         formData.append("collection", activeCollection);
         formData.append(
           "max_length",
@@ -779,17 +912,55 @@
         setBusy("upload", true);
         document.getElementById("upload-result").style.display = "none";
 
+        // Show progress log
+        showProgressLog("Ingesting Document");
+        addProgressLog(
+          `📄 File: <strong>${fileName}</strong> (${fileSize} MB)`,
+          "info",
+        );
+        addProgressLog(
+          `📦 Collection: <strong>${activeCollection}</strong>`,
+          "info",
+        );
+        addProgressLog(`⚙️ Chunk mode: <strong>${mode}</strong>`, "info");
+        addProgressLog("🔄 Uploading file...", "processing");
+
         try {
+          const startTime = Date.now();
+
           const res = await fetch("/upload", {
             method: "POST",
             body: formData,
           });
+
+          addProgressLog("✓ File uploaded", "success");
+          addProgressLog("🔄 Processing document...", "processing");
+
           const data = await res.json();
 
           if (data.error) {
+            addProgressLog(`✗ Error: ${data.error}`, "error");
+            setTimeout(() => hideProgressLog(), 3000);
             toast(data.error, "error");
             return;
           }
+
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+          addProgressLog(`✓ Extracted and processed text`, "success");
+          addProgressLog(
+            `✓ Created <strong>${data.chunks}</strong> chunks`,
+            "success",
+          );
+          addProgressLog(`✓ Generated embeddings (384 dimensions)`, "success");
+          addProgressLog(
+            `✓ Saved to Qdrant collection: <strong>${data.collection}</strong>`,
+            "success",
+          );
+          addProgressLog(
+            `⏱️ Completed in <strong>${elapsed}s</strong>`,
+            "info",
+          );
 
           const existNote = data.collection_existed
             ? " (added to existing collection)"
@@ -797,9 +968,17 @@
           const msg = `✅ ${data.chunks} chunks ingested in collection "${data.collection}"${existNote}`;
           document.getElementById("upload-result").textContent = msg;
           document.getElementById("upload-result").style.display = "block";
-          toast(msg, "success", 5000);
+
+          // Hide progress log after 2 seconds
+          setTimeout(() => {
+            hideProgressLog();
+            toast(msg, "success", 5000);
+          }, 2000);
+
           loadCollections();
         } catch (e) {
+          addProgressLog(`✗ Request error: ${e.message}`, "error");
+          setTimeout(() => hideProgressLog(), 3000);
           toast("Request error: " + e.message, "error");
         } finally {
           setBusy("upload", false);
@@ -815,7 +994,7 @@
         }
 
         let topK = parseInt(document.getElementById("top-k").value);
-        
+
         // Validate and sanitize top_k
         if (isNaN(topK) || topK < 1) {
           topK = 5;
@@ -829,20 +1008,34 @@
           toast("Top-K limited to 100.", "error");
           return;
         }
-        
+
         const useRerank = document.getElementById("use-rerank").checked;
-        
+
         console.log(`[runQuery] top_k=${topK}, use_rerank=${useRerank}`);
 
         setBusy("query", true);
-        
-        // Show progress message
-        const progressMsg = useRerank 
-          ? `🔍 Searching top-${topK} chunks with reranking (retrieving 20 candidates)...`
-          : `🔍 Searching top-${topK} chunks...`;
-        toast(progressMsg, "info", 2000);
+
+        // Show progress log
+        showProgressLog("Searching Semantic Chunks");
+        addProgressLog(`❓ Question: <strong>${question}</strong>`, "info");
+        addProgressLog(
+          `📦 Collection: <strong>${activeCollection}</strong>`,
+          "info",
+        );
+        addProgressLog(`🔢 Top-K: <strong>${topK}</strong>`, "info");
+        if (useRerank) {
+          addProgressLog(
+            `🎯 Reranking: <strong>Enabled</strong> (retrieving 20 candidates)`,
+            "info",
+          );
+        }
+        addProgressLog("🔄 Generating question embedding...", "processing");
 
         try {
+          const startTime = Date.now();
+
+          addProgressLog("🔄 Searching vector database...", "processing");
+
           const res = await fetch("/query", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -854,39 +1047,82 @@
             }),
           });
           const data = await res.json();
-          
+
           console.log(`[runQuery] Response:`, data);
-          console.log(`[runQuery] Received ${data.chunks ? data.chunks.length : 0} chunks`);
-          
+          console.log(
+            `[runQuery] Received ${data.chunks ? data.chunks.length : 0} chunks`,
+          );
+
           if (data.error) {
+            addProgressLog(`✗ Error: ${data.error}`, "error");
+            setTimeout(() => hideProgressLog(), 3000);
             toast(data.error, "error");
             return;
           }
-          
+
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+
+          addProgressLog(
+            `✓ Retrieved ${data.chunks.length} initial results`,
+            "success",
+          );
+
+          if (data.reranked) {
+            addProgressLog("🔄 Reranking with cross-encoder...", "processing");
+            addProgressLog(
+              `✓ Reranked to top-${topK} most relevant chunks`,
+              "success",
+            );
+          }
+
+          addProgressLog(
+            `✓ Generated AI prompt (${data.prompt.length} characters)`,
+            "success",
+          );
+          addProgressLog(
+            `⏱️ Completed in <strong>${elapsed}s</strong>`,
+            "info",
+          );
+
           // Success feedback
-          const resultMsg = data.reranked 
+          const resultMsg = data.reranked
             ? `✓ Found ${data.chunks.length} chunks (reranked from 20 candidates)`
             : `✓ Found ${data.chunks.length} chunks`;
-          toast(resultMsg, "success", 3000);
-          
+
+          // Hide progress log after 1.5 seconds and show results
+          setTimeout(() => {
+            hideProgressLog();
+            toast(resultMsg, "success", 3000);
+          }, 1500);
+
           renderResults(data);
         } catch (e) {
           console.error("[runQuery] Error:", e);
+          addProgressLog(`✗ Request error: ${e.message}`, "error");
+          setTimeout(() => hideProgressLog(), 3000);
           toast("Request error: " + e.message, "error");
         } finally {
           setBusy("query", false);
         }
       }
 
-      function renderResults({ question, collection, chunks, prompt, reranked }) {
+      function renderResults({
+        question,
+        collection,
+        chunks,
+        prompt,
+        reranked,
+      }) {
         const el = document.getElementById("results");
 
         const chunksHTML = chunks
           .map((c, i) => {
             const pct = Math.round(c.score * 100);
             const hasOriginal = c.original_score !== undefined;
-            const originalPct = hasOriginal ? Math.round(c.original_score * 100) : null;
-            
+            const originalPct = hasOriginal
+              ? Math.round(c.original_score * 100)
+              : null;
+
             return `
         <div class="chunk-card">
           <div class="chunk-header">
@@ -894,7 +1130,7 @@
             <div class="chunk-score">
               <span style="color:#a78bfa;font-weight:600">${pct}%</span>
               <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
-              <span>relevance${hasOriginal ? ` (was ${originalPct}%)` : ''}</span>
+              <span>relevance${hasOriginal ? ` (was ${originalPct}%)` : ""}</span>
             </div>
           </div>
           <div class="chunk-body">${escHtml(c.text)}</div>
@@ -902,9 +1138,9 @@
           })
           .join("");
 
-        const rerankBadge = reranked 
+        const rerankBadge = reranked
           ? '<span style="background:#10b981;color:white;padding:2px 6px;border-radius:3px;font-size:0.7rem;margin-left:8px">RERANKED</span>'
-          : '';
+          : "";
 
         el.innerHTML = `
       <div class="result-meta">

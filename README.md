@@ -25,8 +25,6 @@ rag-project/
 ├── tests/
 │   └── test_rag.py      # Unit tests of the main components
 ├── requirements.txt
-├── IMPROVEMENTS.md       # Advanced improvement strategies
-├── RERANKING_EXAMPLE.md  # Reranking feature documentation
 └── README.md
 ```
 
@@ -100,7 +98,63 @@ bash scripts/run_query.sh my_collection 10
 bash scripts/run_query.sh my_collection 5 true
 ```
 
-**Reranking**: Enabling reranking uses a cross-encoder model to re-score retrieved chunks, significantly improving relevance for complex questions. The system retrieves 20 candidates and reranks them to return the top-K most relevant.
+**Reranking**: Enabling reranking uses a cross-encoder model to re-score retrieved chunks, significantly improving relevance for complex questions. The system now **dynamically retrieves** candidates based on your Top-K value:
+
+- **Top-K ≤ 17**: Retrieves 20 candidates for optimal reranking
+- **Top-K > 17**: Retrieves 120% of Top-K (e.g., Top-K=100 → retrieves 120 candidates)
+
+This ensures you always get the requested number of results with high quality reranking. See [TOPK_BUG_FIX.md](TOPK_BUG_FIX.md) for details.
+
+---
+
+## Progress Logging
+
+The system provides **real-time visual feedback** during operations:
+
+### Web Interface
+
+- **Progress Modal**: Animated overlay shows detailed step-by-step logs
+- **Timestamps**: Each operation logged with precise timing
+- **Color-Coded**: Info (blue), Processing (yellow), Success (green), Error (red)
+- **Auto-Dismiss**: Modal automatically closes after completion
+
+**Upload Process Logs:**
+
+```
+📄 File: example.pdf (2.5 MB)
+📦 Collection: documents
+⚙️ Chunk mode: semantic
+🔄 Uploading file...
+✓ File uploaded
+✓ Created 45 chunks
+✓ Generated embeddings (384 dimensions)
+⏱️ Completed in 3.2s
+```
+
+**Search Process Logs:**
+
+```
+❓ Question: Who is Khalil?
+🔢 Top-K: 5
+🎯 Reranking: Enabled
+✓ Retrieved 20 initial results
+✓ Reranked to top-5 most relevant chunks
+⏱️ Completed in 0.54s
+```
+
+### Backend Console
+
+Detailed logs appear in the Flask terminal:
+
+```
+[UPLOAD] Starting document ingestion
+[UPLOAD] ✓ Extracted 15234 characters
+[UPLOAD] ✓ Created 45 chunks
+[UPLOAD] ✓ Generated 45 embedding vectors
+[UPLOAD] ✅ Ingestion completed successfully!
+```
+
+See [PROGRESS_LOGGING.md](PROGRESS_LOGGING.md) for complete documentation.
 
 ---
 

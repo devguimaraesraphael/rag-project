@@ -54,7 +54,7 @@ app.config["MAX_CONTENT_LENGTH"] = UPLOAD_MAX_MB * 1024 * 1024
 # Load model and client once at startup
 _model: SentenceTransformer = None
 _client: QdrantClient = None
-_reranker: CrossEncoder = None
+_reranker = None  # CrossEncoder type - avoiding type hint due to optional import
 
 
 def get_model() -> SentenceTransformer:
@@ -71,7 +71,7 @@ def get_client() -> QdrantClient:
     return _client
 
 
-def get_reranker() -> CrossEncoder:
+def get_reranker():  # Returns CrossEncoder or None - avoiding type hint due to optional import
     """Load cross-encoder reranker model (lazy loading)."""
     global _reranker
     if not RERANKER_AVAILABLE:
@@ -128,16 +128,30 @@ def upload():
     except (ValueError, TypeError):
         breakpoint_threshold_amount = 95.0
 
+    print(f"\n{'='*60}")
+    print(f"[UPLOAD] Starting document ingestion")
+    print(f"[UPLOAD] File: {filename} ({ext})")
+    print(f"[UPLOAD] Collection: {collection}")
+    print(f"[UPLOAD] Chunk mode: {chunk_mode}")
+    print(f"{'='*60}")
+
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             file.save(tmp.name)
             tmp_path = tmp.name
 
+        print(f"[UPLOAD] ✓ File saved temporarily")
+        print(f"[UPLOAD] → Extracting text from {ext} file...")
+        
         text = extract_text(tmp_path)
+        print(f"[UPLOAD] ✓ Extracted {len(text)} characters")
 
+        print(f"[UPLOAD] → Splitting text into chunks ({chunk_mode} mode)...")
+        
         if chunk_mode == CHUNK_MODE_SEMANTIC:
             model = get_model()  # needed during chunking
+            print(f"[UPLOAD]   → Using semantic chunking with {breakpoint_threshold_type}={breakpoint_threshold_amount}")
             chunks = split_text_semantic(
                 text,
                 model,
@@ -145,19 +159,35 @@ def upload():
                 breakpoint_threshold_amount=breakpoint_threshold_amount,
             )
         elif chunk_mode == CHUNK_MODE_PARAGRAPH:
+            print(f"[UPLOAD]   → Splitting by paragraphs")
             chunks = split_text_by_paragraphs(text)
         else:
+            print(f"[UPLOAD]   → Splitting by size (max_length={max_length})")
             chunks = split_text(text, max_length=max_length)
 
         if not chunks:
             return jsonify({"error": "No chunks extracted from document."}), 422
 
+        print(f"[UPLOAD] ✓ Created {len(chunks)} chunks")
+
         client = get_client()
         already_exists = collection_exists(client, collection)
+        
+        if already_exists:
+            print(f"[UPLOAD] → Adding to existing collection '{collection}'")
+        else:
+            print(f"[UPLOAD] → Creating new collection '{collection}'")
 
         model = get_model()  # singleton — already cached if loaded above
+        print(f"[UPLOAD] → Generating embeddings for {len(chunks)} chunks...")
         vectors = generate_embeddings(chunks, model)
+        print(f"[UPLOAD] ✓ Generated {len(vectors)} embedding vectors (384 dimensions)")
+        
+        print(f"[UPLOAD] → Saving to Qdrant...")
         save_to_qdrant(chunks, vectors, collection, client)
+        print(f"[UPLOAD] ✓ Saved to collection '{collection}'")
+        print(f"[UPLOAD] ✅ Ingestion completed successfully!")
+        print(f"{'='*60}\n")
 
         return jsonify({
             "message": f"{len(chunks)} chunks ingested successfully.",
@@ -167,6 +197,8 @@ def upload():
         })
 
     except Exception as e:
+        print(f"[UPLOAD] ✗ ERROR: {e}")
+        print(f"{'='*60}\n")
         return jsonify({"error": str(e)}), 500
     finally:
         if tmp_path and os.path.exists(tmp_path):
@@ -184,23 +216,44 @@ def query():
     if not question:
         return jsonify({"error": "Question cannot be empty."}), 400
 
+    print(f"\n{'='*60}")
+    print(f"[QUERY] Starting semantic search")
+    print(f"[QUERY] Question: {question[:80]}{'...' if len(question) > 80 else ''}")
+    print(f"[QUERY] Collection: {collection}")
+    print(f"[QUERY] Top-K: {top_k}")
+    print(f"[QUERY] Reranking: {'enabled' if use_rerank else 'disabled'}")
+    print(f"{'='*60}")
+
     try:
         model = get_model()
         client = get_client()
         
+        print(f"[QUERY] → Generating question embedding...")
+        
         # Load reranker if requested
         reranker = get_reranker() if use_rerank else None
         
-        print(f"[QUERY] top_k={top_k}, use_rerank={use_rerank}, reranker={'loaded' if reranker else 'None'}")
+        if use_rerank and reranker:
+            retrieve_count = max(20, int(top_k * 1.2))
+            print(f"[QUERY] ✓ Reranker loaded (will retrieve {retrieve_count} candidates and rerank to top-{top_k})")
+        
+        print(f"[QUERY] → Searching vector database...")
         
         chunks = search_similar_chunks(
             question, model, client, collection, 
             top_k=top_k, reranker=reranker
         )
         
-        print(f"[QUERY] Returned {len(chunks)} chunks (expected {top_k})")
+        print(f"[QUERY] ✓ Found {len(chunks)} chunks")
         
+        if reranker and use_rerank:
+            print(f"[QUERY] ✓ Reranked results (scores updated)")
+        
+        print(f"[QUERY] → Building AI prompt...")
         prompt = build_prompt(question, chunks)
+        print(f"[QUERY] ✓ Prompt generated ({len(prompt)} characters)")
+        print(f"[QUERY] ✅ Query completed successfully!")
+        print(f"{'='*60}\n")
 
         return jsonify({
             "question": question,
@@ -211,7 +264,8 @@ def query():
         })
 
     except Exception as e:
-        print(f"[QUERY ERROR] {e}")
+        print(f"[QUERY] ✗ ERROR: {e}")
+        print(f"{'='*60}\n")
         return jsonify({"error": str(e)}), 500
 
 
