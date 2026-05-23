@@ -14,7 +14,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from ingest import split_text, split_text_by_paragraphs, split_text_semantic, generate_embeddings
 from query import build_prompt, search_similar_chunks
 
-from sentence_transformers import SentenceTransformer
+# embedding_config — Import for testing with actual model
+from embedding_config import load_model, VECTOR_SIZE
 
 
 class TestSplitText(unittest.TestCase):
@@ -64,20 +65,22 @@ class TestSplitTextSemantic(unittest.TestCase):
     """
 
     def _make_mock_model(self):
-        """Returns a mock SentenceTransformer with deterministic encode."""
+        """Returns a mock model compatible with embedding_config interface."""
         mock = MagicMock()
 
-        def fake_encode(texts, convert_to_numpy=True, show_progress_bar=False, **kwargs):
+        def fake_encode(texts, batch_size=12, show_progress_bar=False, **kwargs):
+            """Mock encode that returns dict with 'dense_vecs' key (BGE-M3 interface)."""
             n = len(texts)
             # Vectors that alternate between two opposite clusters, ensuring
             # that SemanticChunker detects distance variation.
-            vectors = np.zeros((n, 384), dtype=np.float32)
+            vectors = np.zeros((n, VECTOR_SIZE), dtype=np.float32)
             for i in range(n):
                 vectors[i, i % 2] = 1.0
                 # Small noise to avoid identical distances
                 rng = np.random.default_rng(i)
-                vectors[i] += rng.standard_normal(384).astype(np.float32) * 0.01
-            return vectors
+                vectors[i] += rng.standard_normal(VECTOR_SIZE).astype(np.float32) * 0.01
+            # Return dict with 'dense_vecs' to match BGE-M3 interface
+            return {"dense_vecs": vectors}
 
         mock.encode.side_effect = fake_encode
         return mock
@@ -128,19 +131,36 @@ class TestSplitTextSemantic(unittest.TestCase):
 
 
 class TestGenerateEmbeddings(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.model = SentenceTransformer("all-MiniLM-L6-v2")
+    """Tests for embedding generation.
+    
+    Uses mock model to avoid downloading large models during unit tests.
+    """
+    
+    def _make_mock_model(self):
+        """Returns a mock model compatible with embedding_config interface."""
+        mock = MagicMock()
+        
+        def fake_encode(texts, batch_size=12, show_progress_bar=False, **kwargs):
+            """Mock encode that returns dict with 'dense_vecs' key."""
+            n = len(texts)
+            vectors = np.random.randn(n, VECTOR_SIZE).astype(np.float32)
+            return {"dense_vecs": vectors}
+        
+        mock.encode.side_effect = fake_encode
+        return mock
 
     def test_embedding_dimension(self):
         chunks = ["Test text for embedding."]
-        vectors = generate_embeddings(chunks, self.model)
+        model = self._make_mock_model()  # Use mock instead of real model
+        vectors = generate_embeddings(chunks, model)
         self.assertEqual(len(vectors), 1)
-        self.assertEqual(len(vectors[0]), 384)
+        # embedding_config — Use VECTOR_SIZE constant
+        self.assertEqual(len(vectors[0]), VECTOR_SIZE)
 
     def test_multiple_chunks(self):
         chunks = ["First chunk.", "Second chunk.", "Third chunk."]
-        vectors = generate_embeddings(chunks, self.model)
+        model = self._make_mock_model()  # Use mock instead of real model
+        vectors = generate_embeddings(chunks, model)
         self.assertEqual(len(vectors), 3)
 
 

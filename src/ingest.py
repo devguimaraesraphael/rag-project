@@ -13,15 +13,15 @@ from pathlib import Path
 from typing import List
 
 from pypdf import PdfReader
-from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from tqdm import tqdm
 
+# embedding_config
+from embedding_config import load_model, encode_texts, VECTOR_SIZE
+
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-VECTOR_SIZE = 384
 DEFAULT_MAX_LENGTH = 400
 DEFAULT_MIN_LENGTH = 30
 DEFAULT_COLLECTION = "documents"
@@ -79,22 +79,21 @@ def extract_text(file_path: str) -> str:
 # ─── LangChain adapter ─────────────────────────────────────────────────────
 
 class SentenceTransformerEmbeddingsAdapter:
-    """Adapts a SentenceTransformer to the LangChain Embeddings interface.
+    """Adapts the embedding model to the LangChain Embeddings interface.
 
     Allows reusing the already loaded model in the project without loading it
     a second time or depending on HuggingFaceEmbeddings.
     """
 
-    def __init__(self, model: SentenceTransformer) -> None:
+    def __init__(self, model) -> None:
         self._model = model
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        vectors = self._model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
-        return [v.tolist() for v in vectors]
+        return encode_texts(self._model, texts, show_progress=False)  # embedding_config
 
     def embed_query(self, text: str) -> List[float]:
-        vector = self._model.encode([text], convert_to_numpy=True, show_progress_bar=False)
-        return vector[0].tolist()
+        from embedding_config import encode_query  # embedding_config
+        return encode_query(self._model, text)  # embedding_config
 
 
 # ─── Splitting strategies ─────────────────────────────────────────────────────
@@ -134,7 +133,7 @@ def split_text_by_paragraphs(text: str, min_length: int = DEFAULT_MIN_LENGTH) ->
 
 def split_text_semantic(
     text: str,
-    model: SentenceTransformer,
+    model,  # embedding_config — model type abstracted
     breakpoint_threshold_type: str = "percentile",
     breakpoint_threshold_amount: float = 95.0,
     min_length: int = DEFAULT_MIN_LENGTH,
@@ -147,7 +146,7 @@ def split_text_semantic(
 
     Args:
         text: Full text to split.
-        model: Already loaded SentenceTransformer model (reused via adapter).
+        model: Already loaded embedding model (reused via adapter).
         breakpoint_threshold_type: Cutting criterion — 'percentile',
             'standard_deviation' or 'interquartile'.
         breakpoint_threshold_amount: Cut sensitivity. For 'percentile',
@@ -156,7 +155,7 @@ def split_text_semantic(
     """
     from langchain_experimental.text_splitter import SemanticChunker
 
-    adapter = SentenceTransformerEmbeddingsAdapter(model)
+    adapter = SentenceTransformerEmbeddingsAdapter(model)  # embedding_config
     chunker = SemanticChunker(
         embeddings=adapter,
         breakpoint_threshold_type=breakpoint_threshold_type,
@@ -174,10 +173,8 @@ def collection_exists(client: QdrantClient, collection_name: str) -> bool:
     return collection_name in existing
 
 
-def generate_embeddings(chunks: List[str], model: SentenceTransformer) -> List[List[float]]:
-    """Generates embeddings for each chunk in batch with progress bar."""
-    vectors = model.encode(chunks, show_progress_bar=True, convert_to_numpy=True)
-    return [v.tolist() for v in vectors]
+def generate_embeddings(chunks, model):
+    return encode_texts(model, chunks, show_progress=True)  # embedding_config
 
 
 def save_to_qdrant(
@@ -222,7 +219,7 @@ def ingest(
     if chunk_mode == CHUNK_MODE_SEMANTIC:
         # Model is needed during chunking — load it first
         print("Loading embedding model for semantic chunking...")
-        model = SentenceTransformer(EMBEDDING_MODEL)
+        model = load_model()  # embedding_config
         chunks = split_text_semantic(
             text,
             model,
@@ -240,7 +237,7 @@ def ingest(
 
     if model is None:
         print("Loading embedding model...")
-        model = SentenceTransformer(EMBEDDING_MODEL)
+        model = load_model()  # embedding_config
 
     print("Generating embeddings...")
     vectors = generate_embeddings(chunks, model)

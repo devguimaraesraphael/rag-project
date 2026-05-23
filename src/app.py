@@ -18,6 +18,9 @@ from flask import Flask, render_template, request, jsonify
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+# embedding_config
+from embedding_config import load_model
+
 from ingest import (
     extract_text,
     split_text,
@@ -34,7 +37,6 @@ from ingest import (
 )
 from query import search_similar_chunks, build_prompt
 
-from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 
 try:
@@ -52,15 +54,16 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = UPLOAD_MAX_MB * 1024 * 1024
 
 # Load model and client once at startup
-_model: SentenceTransformer = None
+_model = None  # embedding_config — model type abstracted
 _client: QdrantClient = None
 _reranker = None  # CrossEncoder type - avoiding type hint due to optional import
 
 
-def get_model() -> SentenceTransformer:
+def get_model():
+    """Lazy-load embedding model singleton."""
     global _model
     if _model is None:
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
+        _model = load_model()  # embedding_config
     return _model
 
 
@@ -181,7 +184,7 @@ def upload():
         model = get_model()  # singleton — already cached if loaded above
         print(f"[UPLOAD] → Generating embeddings for {len(chunks)} chunks...")
         vectors = generate_embeddings(chunks, model)
-        print(f"[UPLOAD] ✓ Generated {len(vectors)} embedding vectors (384 dimensions)")
+        print(f"[UPLOAD] ✓ Generated {len(vectors)} embedding vectors (1024 dimensions)")  # embedding_config
         
         print(f"[UPLOAD] → Saving to Qdrant...")
         save_to_qdrant(chunks, vectors, collection, client)

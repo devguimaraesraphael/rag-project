@@ -1,4 +1,33 @@
-sentence-transformers==3.0.1
+# ============================================================================
+# EMBEDDING MODELS
+# ============================================================================
+# Current model: BAAI/bge-m3 (production-grade, 1024 dimensions)
+FlagEmbedding>=1.2.10
+
+# Alternative lightweight models (uncomment to use):
+# 
+# DISCLAIMER: To use alternative models, uncomment the corresponding line below,
+# run `pip install -r requirements.txt`, then update src/embedding_config.py
+# to use the desired model (see commented examples in that file).
+# IMPORTANT: You must re-ingest all documents after changing models because
+# vector dimensions will change!
+# 
+# Option 1: all-MiniLM-L6-v2 (90MB, 384 dimensions, fast, English-focused)
+# sentence-transformers==3.0.1
+#
+# Option 2: BAAI/bge-small-en-v1.5 (133MB, 384 dimensions, balanced quality/speed)
+# sentence-transformers==3.0.1
+#
+# Option 3: paraphrase-multilingual-MiniLM-L12-v2 (470MB, 384 dimensions, multilingual)
+# sentence-transformers==3.0.1
+
+# Note: sentence-transformers is needed for all alternative models above.
+# Uncomment if using any of the alternatives:
+# sentence-transformers==3.0.1
+
+# ============================================================================
+# CORE DEPENDENCIES
+# ============================================================================
 qdrant-client==1.9.1
 pypdf==4.3.1
 tqdm==4.66.4

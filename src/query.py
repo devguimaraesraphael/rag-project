@@ -9,8 +9,10 @@ import argparse
 import sys
 from typing import List, Callable, Optional, Any
 
-from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
+
+# embedding_config
+from embedding_config import load_model, encode_query
 
 try:
     from sentence_transformers import CrossEncoder
@@ -21,7 +23,6 @@ except ImportError:
 
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 DEFAULT_COLLECTION = "documents"
 DEFAULT_TOP_K = 5
@@ -68,7 +69,7 @@ def rerank_chunks(
 
 def search_similar_chunks(
     question: str,
-    model: SentenceTransformer,
+    model,  # embedding_config — model type abstracted
     client: QdrantClient,
     collection_name: str,
     top_k: int = DEFAULT_TOP_K,
@@ -81,7 +82,7 @@ def search_similar_chunks(
     
     Args:
         question: User's question
-        model: SentenceTransformer for generating embeddings
+        model: Embedding model instance for generating embeddings
         client: QdrantClient instance
         collection_name: Name of the collection to search
         top_k: Final number of chunks to return
@@ -91,7 +92,7 @@ def search_similar_chunks(
     Returns:
         List of dicts with 'text' and 'score' (and 'original_score' if reranked)
     """
-    embedding = model.encode([question], convert_to_numpy=True)[0].tolist()
+    embedding = encode_query(model, question)  # embedding_config
 
     # Retrieve more candidates if reranking is enabled
     # For reranking: retrieve at least top_k, or 20% more than top_k for better reranking margin
@@ -149,7 +150,7 @@ def query_loop(
 ) -> None:
     """Interactive loop: receives questions, searches context and displays AI response."""
     print("Loading embedding model...")
-    model = SentenceTransformer(EMBEDDING_MODEL)
+    model = load_model()  # embedding_config
 
     print("Connecting to Qdrant...")
     client = QdrantClient(QDRANT_HOST, port=QDRANT_PORT)
