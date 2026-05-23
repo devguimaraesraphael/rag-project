@@ -68,8 +68,8 @@ class TestSplitTextSemantic(unittest.TestCase):
         """Returns a mock model compatible with embedding_config interface."""
         mock = MagicMock()
 
-        def fake_encode(texts, batch_size=12, show_progress_bar=False, **kwargs):
-            """Mock encode that returns dict with 'dense_vecs' key (BGE-M3 interface)."""
+        def fake_encode(texts, convert_to_numpy=True, show_progress_bar=False, **kwargs):
+            """Mock encode that returns numpy arrays (SentenceTransformer interface)."""
             n = len(texts)
             # Vectors that alternate between two opposite clusters, ensuring
             # that SemanticChunker detects distance variation.
@@ -79,8 +79,7 @@ class TestSplitTextSemantic(unittest.TestCase):
                 # Small noise to avoid identical distances
                 rng = np.random.default_rng(i)
                 vectors[i] += rng.standard_normal(VECTOR_SIZE).astype(np.float32) * 0.01
-            # Return dict with 'dense_vecs' to match BGE-M3 interface
-            return {"dense_vecs": vectors}
+            return vectors
 
         mock.encode.side_effect = fake_encode
         return mock
@@ -140,11 +139,11 @@ class TestGenerateEmbeddings(unittest.TestCase):
         """Returns a mock model compatible with embedding_config interface."""
         mock = MagicMock()
         
-        def fake_encode(texts, batch_size=12, show_progress_bar=False, **kwargs):
-            """Mock encode that returns dict with 'dense_vecs' key."""
+        def fake_encode(texts, convert_to_numpy=True, show_progress_bar=False, **kwargs):
+            """Mock encode that returns numpy arrays (SentenceTransformer interface)."""
             n = len(texts)
             vectors = np.random.randn(n, VECTOR_SIZE).astype(np.float32)
-            return {"dense_vecs": vectors}
+            return vectors
         
         mock.encode.side_effect = fake_encode
         return mock

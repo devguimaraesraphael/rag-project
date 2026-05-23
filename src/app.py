@@ -184,7 +184,7 @@ def upload():
         model = get_model()  # singleton — already cached if loaded above
         print(f"[UPLOAD] → Generating embeddings for {len(chunks)} chunks...")
         vectors = generate_embeddings(chunks, model)
-        print(f"[UPLOAD] ✓ Generated {len(vectors)} embedding vectors (1024 dimensions)")  # embedding_config
+        print(f"[UPLOAD] ✓ Generated {len(vectors)} embedding vectors (384 dimensions)")  # embedding_config
         
         print(f"[UPLOAD] → Saving to Qdrant...")
         save_to_qdrant(chunks, vectors, collection, client)

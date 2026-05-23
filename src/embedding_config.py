@@ -20,50 +20,50 @@ To switch models:
 from typing import List
 
 # ============================================================================
-# CURRENT MODEL: BAAI/bge-m3 (Production-grade, multilingual, 1024 dimensions)
+# CURRENT MODEL: all-MiniLM-L6-v2 (Lightweight, fast, 384 dimensions) ✅ ACTIVE
 # ============================================================================
-from FlagEmbedding import BGEM3FlagModel
-VECTOR_SIZE = 1024
+from sentence_transformers import SentenceTransformer
+VECTOR_SIZE = 384
 
 def load_model():
-    """Loads BAAI/bge-m3 model (2.27GB, 88 languages, best quality)."""
-    return BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
+    """Loads all-MiniLM-L6-v2 model (90MB, fast, English-focused)."""
+    return SentenceTransformer("all-MiniLM-L6-v2")
 
 def encode_texts(model, texts: List[str], show_progress: bool = False) -> List[List[float]]:
-    """BGE-M3 batch encoding."""
-    output = model.encode(texts, batch_size=12)
-    return output["dense_vecs"].tolist()
+    """SentenceTransformer batch encoding."""
+    vectors = model.encode(texts, convert_to_numpy=True, show_progress_bar=show_progress)
+    return [v.tolist() for v in vectors]
 
 def encode_query(model, text: str) -> List[float]:
-    """BGE-M3 single query encoding."""
-    output = model.encode([text])
-    return output["dense_vecs"][0].tolist()
+    """SentenceTransformer single query encoding."""
+    vector = model.encode([text], convert_to_numpy=True, show_progress_bar=False)
+    return vector[0].tolist()
 
 
 # ============================================================================
-# ALTERNATIVE MODEL 1: all-MiniLM-L6-v2 (Lightweight, fast, 384 dimensions)
+# ALTERNATIVE MODEL 1: BAAI/bge-m3 (Production-grade, multilingual, 1024 dimensions)
 # ============================================================================
-# Pros: Very fast, CPU-friendly, small size (90MB), good for prototyping
-# Cons: English-focused, lower quality than BGE models
+# Pros: Best quality, 88 languages, production-ready
+# Cons: Large size (2.27GB), slower, GPU recommended
 # 
 # Uncomment below and comment out current model to use:
 # ----------------------------------------------------------------------------
-# from sentence_transformers import SentenceTransformer
-# VECTOR_SIZE = 384
+# from FlagEmbedding import BGEM3FlagModel
+# VECTOR_SIZE = 1024
 #
 # def load_model():
-#     """Loads all-MiniLM-L6-v2 model (90MB, fast, English-focused)."""
-#     return SentenceTransformer("all-MiniLM-L6-v2")
+#     """Loads BAAI/bge-m3 model (2.27GB, 88 languages, best quality)."""
+#     return BGEM3FlagModel("BAAI/bge-m3", use_fp16=True)
 #
 # def encode_texts(model, texts: List[str], show_progress: bool = False) -> List[List[float]]:
-#     """SentenceTransformer batch encoding."""
-#     vectors = model.encode(texts, convert_to_numpy=True, show_progress_bar=show_progress)
-#     return [v.tolist() for v in vectors]
+#     """BGE-M3 batch encoding."""
+#     output = model.encode(texts, batch_size=12)
+#     return output["dense_vecs"].tolist()
 #
 # def encode_query(model, text: str) -> List[float]:
-#     """SentenceTransformer single query encoding."""
-#     vector = model.encode([text], convert_to_numpy=True, show_progress_bar=False)
-#     return vector[0].tolist()
+#     """BGE-M3 single query encoding."""
+#     output = model.encode([text])
+#     return output["dense_vecs"][0].tolist()
 
 
 # ============================================================================

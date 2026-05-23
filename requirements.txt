@@ -1,8 +1,11 @@
 # ============================================================================
 # EMBEDDING MODELS
 # ============================================================================
-# Current model: BAAI/bge-m3 (production-grade, 1024 dimensions)
-FlagEmbedding>=1.2.10
+# Current model: all-MiniLM-L6-v2 (lightweight, 384 dimensions)
+sentence-transformers==3.0.1
+
+# Production model (comment out if using alternative):
+# FlagEmbedding>=1.2.10
 
 # Alternative lightweight models (uncomment to use):
 # 
@@ -12,7 +15,7 @@ FlagEmbedding>=1.2.10
 # IMPORTANT: You must re-ingest all documents after changing models because
 # vector dimensions will change!
 # 
-# Option 1: all-MiniLM-L6-v2 (90MB, 384 dimensions, fast, English-focused)
+# Option 1: all-MiniLM-L6-v2 (90MB, 384 dimensions, fast, English-focused) ✅ ACTIVE
 # sentence-transformers==3.0.1
 #
 # Option 2: BAAI/bge-small-en-v1.5 (133MB, 384 dimensions, balanced quality/speed)
@@ -21,9 +24,8 @@ FlagEmbedding>=1.2.10
 # Option 3: paraphrase-multilingual-MiniLM-L12-v2 (470MB, 384 dimensions, multilingual)
 # sentence-transformers==3.0.1
 
-# Note: sentence-transformers is needed for all alternative models above.
-# Uncomment if using any of the alternatives:
-# sentence-transformers==3.0.1
+# Option 4: BAAI/bge-m3 (2.27GB, 1024 dimensions, production-grade, multilingual)
+# FlagEmbedding>=1.2.10
 
 # ============================================================================
 # CORE DEPENDENCIES
