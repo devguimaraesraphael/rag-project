@@ -98,37 +98,87 @@ class SentenceTransformerEmbeddingsAdapter:
 
 # ─── Splitting strategies ─────────────────────────────────────────────────────
 
-def split_text(text: str, max_length: int = DEFAULT_MAX_LENGTH, min_length: int = DEFAULT_MIN_LENGTH) -> List[str]:
-    """Splits text into chunks respecting max length without cutting words."""
+def split_text_by_size(text: str, max_length: int = DEFAULT_MAX_LENGTH, min_length: int = DEFAULT_MIN_LENGTH) -> List[str]:
+    """Splits text into fixed-size chunks by CHARACTER COUNT, ignoring paragraph structure.
+    
+    This is a pure character-based split that cuts the text every max_length characters,
+    regardless of paragraphs or sentence boundaries. Only tries to avoid cutting words.
+    
+    Args:
+        text: Full text to split.
+        max_length: Maximum characters per chunk.
+        min_length: Minimum characters to keep a chunk.
+    
+    Returns:
+        List of text chunks of approximately max_length characters.
+    """
     chunks: List[str] = []
-
-    for paragraph in text.split("\n"):
-        paragraph = paragraph.strip()
-        if len(paragraph) < min_length:
-            continue
-
-        while len(paragraph) > max_length:
-            split_point = paragraph.rfind(" ", 0, max_length)
-            if split_point == -1:
-                split_point = max_length
-            chunks.append(paragraph[:split_point].strip())
-            paragraph = paragraph[split_point:].strip()
-
-        if len(paragraph) >= min_length:
-            chunks.append(paragraph)
-
+    text = text.strip()
+    
+    while len(text) > max_length:
+        # Try to find a space before max_length to avoid cutting words
+        split_point = text.rfind(" ", 0, max_length)
+        if split_point == -1:
+            split_point = max_length
+        
+        chunk = text[:split_point].strip()
+        if len(chunk) >= min_length:
+            chunks.append(chunk)
+        
+        text = text[split_point:].strip()
+    
+    # Add remaining text
+    if len(text) >= min_length:
+        chunks.append(text)
+    
     return chunks
 
 
-def split_text_by_paragraphs(text: str, min_length: int = DEFAULT_MIN_LENGTH) -> List[str]:
-    """Splits text by paragraphs separated by blank line(s)."""
+def split_text_by_paragraphs(text: str, min_length: int = DEFAULT_MIN_LENGTH, max_length: int = None) -> List[str]:
+    """Splits text by PARAGRAPH structure, keeping paragraphs intact.
+    
+    Paragraphs are identified by blank lines (\\n\\s*\\n). Each paragraph becomes a chunk.
+    If max_length is provided, paragraphs longer than max_length will be split further.
+    
+    Args:
+        text: Full text to split.
+        min_length: Minimum characters to keep a chunk.
+        max_length: Optional maximum length. If provided, large paragraphs will be split.
+    
+    Returns:
+        List of text chunks, one per paragraph (or smaller if max_length is set).
+    """
     raw = re.split(r"\n\s*\n", text)
     chunks: List[str] = []
+    
     for para in raw:
         para = para.strip()
-        if len(para) >= min_length:
+        if len(para) < min_length:
+            continue
+        
+        # If paragraph is too large and max_length is set, split it
+        if max_length and len(para) > max_length:
+            while len(para) > max_length:
+                split_point = para.rfind(" ", 0, max_length)
+                if split_point == -1:
+                    split_point = max_length
+                chunks.append(para[:split_point].strip())
+                para = para[split_point:].strip()
+            
+            if len(para) >= min_length:
+                chunks.append(para)
+        else:
             chunks.append(para)
+    
     return chunks
+
+
+def split_text(text: str, max_length: int = DEFAULT_MAX_LENGTH, min_length: int = DEFAULT_MIN_LENGTH) -> List[str]:
+    """Legacy function for backwards compatibility. Uses paragraph-based splitting.
+    
+    DEPRECATED: Use split_text_by_size() or split_text_by_paragraphs() explicitly.
+    """
+    return split_text_by_paragraphs(text, min_length, max_length)
 
 
 def split_text_semantic(
@@ -227,10 +277,10 @@ def ingest(
             breakpoint_threshold_amount=breakpoint_threshold_amount,
         )
     elif chunk_mode == CHUNK_MODE_PARAGRAPH:
-        chunks = split_text_by_paragraphs(text)
+        chunks = split_text_by_paragraphs(text, max_length=max_length)
         model = None
-    else:
-        chunks = split_text(text, max_length=max_length)
+    else:  # CHUNK_MODE_SIZE (default)
+        chunks = split_text_by_size(text, max_length=max_length)
         model = None
 
     print(f"{len(chunks)} chunks generated.")

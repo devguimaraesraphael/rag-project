@@ -23,7 +23,7 @@ from embedding_config import load_model
 
 from ingest import (
     extract_text,
-    split_text,
+    split_text_by_size,
     split_text_by_paragraphs,
     split_text_semantic,
     generate_embeddings,
@@ -162,11 +162,11 @@ def upload():
                 breakpoint_threshold_amount=breakpoint_threshold_amount,
             )
         elif chunk_mode == CHUNK_MODE_PARAGRAPH:
-            print(f"[UPLOAD]   → Splitting by paragraphs")
-            chunks = split_text_by_paragraphs(text)
-        else:
-            print(f"[UPLOAD]   → Splitting by size (max_length={max_length})")
-            chunks = split_text(text, max_length=max_length)
+            print(f"[UPLOAD]   → Splitting by paragraphs (keeping paragraph structure)")
+            chunks = split_text_by_paragraphs(text, max_length=max_length)
+        else:  # CHUNK_MODE_SIZE
+            print(f"[UPLOAD]   → Splitting by pure character count (max_length={max_length})")
+            chunks = split_text_by_size(text, max_length=max_length)
 
         if not chunks:
             return jsonify({"error": "No chunks extracted from document."}), 422

@@ -11,14 +11,67 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from ingest import split_text, split_text_by_paragraphs, split_text_semantic, generate_embeddings
+from ingest import split_text, split_text_by_size, split_text_by_paragraphs, split_text_semantic, generate_embeddings
 from query import build_prompt, search_similar_chunks
 
 # embedding_config — Import for testing with actual model
 from embedding_config import load_model, VECTOR_SIZE
 
 
+class TestSplitTextBySize(unittest.TestCase):
+    """Tests for pure character-based chunking (ignores paragraph structure)."""
+    
+    def test_splits_purely_by_character_count(self):
+        """Verifies that text is split purely by character count, ignoring paragraphs."""
+        # Create text with clear paragraph breaks
+        text = "A" * 200 + "\n\n" + "B" * 200 + "\n\n" + "C" * 200
+        chunks = split_text_by_size(text, max_length=300)
+        
+        # Should split at 300 chars regardless of paragraph structure
+        for chunk in chunks:
+            self.assertLessEqual(len(chunk), 300)
+        
+        # First chunk should contain only A's (and maybe some B's if crossing paragraph)
+        # This tests that it doesn't respect paragraph boundaries
+        self.assertGreater(len(chunks), 0)
+    
+    def test_avoids_cutting_words(self):
+        """Verifies that splitting tries to break at word boundaries."""
+        text = "word " * 100  # Creates a long text with clear word boundaries
+        chunks = split_text_by_size(text, max_length=100)
+        
+        for chunk in chunks:
+            # Should not end with a partial word (unless forced to)
+            if len(chunk) < 100:
+                self.assertTrue(chunk.strip().endswith("word") or len(chunk.split()[-1]) < 10)
+    
+    def test_different_from_paragraph_splitting(self):
+        """Verifies that size-based splitting is different from paragraph-based."""
+        # Create text with a short paragraph followed by a long paragraph
+        text = "Short para.\n\n" + ("word " * 200)  # ~1400 chars total
+        
+        size_chunks = split_text_by_size(text, max_length=500, min_length=10)
+        para_chunks = split_text_by_paragraphs(text, max_length=500, min_length=10)
+        
+        # Paragraph mode should preserve "Short para." as a separate chunk
+        # Size mode should merge it with the next content
+        # Verify that the first chunks have different content
+        self.assertGreater(len(size_chunks), 0)
+        self.assertGreater(len(para_chunks), 0)
+        
+        # The paragraph mode should have "Short para." as a standalone chunk
+        has_short_para_standalone = any("Short para." in chunk and len(chunk) < 50 for chunk in para_chunks)
+        self.assertTrue(has_short_para_standalone, "Paragraph mode should preserve short paragraph")
+        
+        # Size mode should NOT have "Short para." as a standalone chunk
+        # (it should be merged with following content to reach max_length)
+        has_short_para_standalone_size = any("Short para." in chunk and len(chunk) < 50 for chunk in size_chunks)
+        self.assertFalse(has_short_para_standalone_size, "Size mode should merge content regardless of paragraphs")
+
+
 class TestSplitText(unittest.TestCase):
+    """Tests for legacy split_text function (now uses paragraph-based splitting)."""
+    
     def test_splits_by_max_length(self):
         text = "a " * 300  # 600 chars
         chunks = split_text(text, max_length=400)

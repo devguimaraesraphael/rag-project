@@ -564,13 +564,17 @@
           <div style="margin-top: 0.75rem">
             <label>Chunk Mode</label>
             <select id="chunk-mode" onchange="onChunkModeChange(this.value)">
-              <option value="size">By size (characters)</option>
-              <option value="paragraph">By paragraphs</option>
-              <option value="semantic">Semantic (by similarity)</option>
+              <option value="size">
+                By Character Count (fixed size, ignores paragraphs)
+              </option>
+              <option value="paragraph">
+                By Paragraph Structure (keeps paragraphs intact)
+              </option>
+              <option value="semantic">Semantic (by meaning similarity)</option>
             </select>
           </div>
           <div id="max-length-row" style="margin-top: 0.75rem">
-            <label>Max chunk size</label>
+            <label>Max chunk size (characters)</label>
             <input
               type="number"
               id="max-length"
@@ -922,7 +926,24 @@
           `📦 Collection: <strong>${activeCollection}</strong>`,
           "info",
         );
-        addProgressLog(`⚙️ Chunk mode: <strong>${mode}</strong>`, "info");
+
+        // Show descriptive chunk mode
+        const modeDescriptions = {
+          size: "By Character Count (pure size-based)",
+          paragraph: "By Paragraph Structure (keeps paragraphs)",
+          semantic: "Semantic (by meaning similarity)",
+        };
+        const modeDesc = modeDescriptions[mode] || mode;
+        addProgressLog(`⚙️ Chunk mode: <strong>${modeDesc}</strong>`, "info");
+
+        if (mode === "size" || mode === "paragraph") {
+          const maxLen = document.getElementById("max-length").value;
+          addProgressLog(
+            `📏 Max chunk size: <strong>${maxLen} characters</strong>`,
+            "info",
+          );
+        }
+
         addProgressLog("🔄 Uploading file...", "processing");
 
         try {
@@ -1173,10 +1194,26 @@
 
       // ── Chunk mode toggle ────────────────────────────────────
       function onChunkModeChange(mode) {
-        document.getElementById("max-length-row").style.display =
-          mode === "size" ? "" : "none";
-        document.getElementById("semantic-params-row").style.display =
-          mode === "semantic" ? "" : "none";
+        const maxLengthRow = document.getElementById("max-length-row");
+        const semanticParamsRow = document.getElementById(
+          "semantic-params-row",
+        );
+        const maxLengthLabel = maxLengthRow.querySelector("label");
+
+        if (mode === "semantic") {
+          maxLengthRow.style.display = "none";
+          semanticParamsRow.style.display = "";
+        } else if (mode === "paragraph") {
+          maxLengthRow.style.display = "";
+          semanticParamsRow.style.display = "none";
+          maxLengthLabel.textContent =
+            "Max chunk size (optional - splits large paragraphs)";
+        } else {
+          // size
+          maxLengthRow.style.display = "";
+          semanticParamsRow.style.display = "none";
+          maxLengthLabel.textContent = "Max chunk size (characters)";
+        }
       }
 
       // ── Init ────────────────────────────────────────────────
