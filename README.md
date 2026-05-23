@@ -25,6 +25,8 @@ rag-project/
 ├── tests/
 │   └── test_rag.py      # Unit tests of the main components
 ├── requirements.txt
+├── IMPROVEMENTS.md       # Advanced improvement strategies
+├── RERANKING_EXAMPLE.md  # Reranking feature documentation
 └── README.md
 ```
 
@@ -94,7 +96,11 @@ bash scripts/run_ingest.sh book.pdf my_collection 500
 bash scripts/run_query.sh
 # Or with custom parameters:
 bash scripts/run_query.sh my_collection 10
+# Or with reranking enabled (better semantic relevance):
+bash scripts/run_query.sh my_collection 5 true
 ```
+
+**Reranking**: Enabling reranking uses a cross-encoder model to re-score retrieved chunks, significantly improving relevance for complex questions. The system retrieves 20 candidates and reranks them to return the top-K most relevant.
 
 ---
 

@@ -555,6 +555,30 @@
           <div class="section-title">Search Settings</div>
           <label>Top-K Chunks</label>
           <input type="number" id="top-k" value="5" min="1" max="20" />
+
+          <div style="margin-top: 0.75rem">
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                cursor: pointer;
+              "
+            >
+              <input type="checkbox" id="use-rerank" style="cursor: pointer" />
+              <span>Enable Reranking (better relevance)</span>
+            </label>
+            <p
+              style="
+                font-size: 0.72rem;
+                color: #64748b;
+                margin-top: 0.25rem;
+                margin-left: 1.5rem;
+              "
+            >
+              Uses cross-encoder for improved semantic matching
+            </p>
+          </div>
         </div>
 
         <!-- Manage Collection -->
@@ -780,6 +804,7 @@
         }
 
         const topK = parseInt(document.getElementById("top-k").value) || 5;
+        const useRerank = document.getElementById("use-rerank").checked;
 
         setBusy("query", true);
 
@@ -791,6 +816,7 @@
               question,
               collection: activeCollection,
               top_k: topK,
+              use_rerank: useRerank,
             }),
           });
           const data = await res.json();
@@ -831,11 +857,11 @@
       <div class="result-meta">
         <span>Question: <strong>${escHtml(question)}</strong></span>
         <span>Collection: <strong>${escHtml(collection)}</strong></span>
-        <span>${chunks.length} trechos encontrados</span>
+        <span>${chunks.length} chunks found</span>
       </div>
       ${chunksHTML}
       <details class="prompt-section">
-        <summary>🧠 Ver prompt gerado para a IA</summary>
+        <summary>🧠 View generated AI prompt</summary>
         <div class="prompt-body">${escHtml(prompt)}</div>
       </details>`;
       }

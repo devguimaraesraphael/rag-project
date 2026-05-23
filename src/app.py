@@ -37,6 +37,13 @@ from query import search_similar_chunks, build_prompt
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 
+try:
+    from sentence_transformers import CrossEncoder
+    RERANKER_AVAILABLE = True
+except ImportError:
+    RERANKER_AVAILABLE = False
+    CrossEncoder = None
+
 QDRANT_HOST = os.environ.get("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.environ.get("QDRANT_PORT", 6333))
 UPLOAD_MAX_MB = 100
@@ -47,6 +54,7 @@ app.config["MAX_CONTENT_LENGTH"] = UPLOAD_MAX_MB * 1024 * 1024
 # Load model and client once at startup
 _model: SentenceTransformer = None
 _client: QdrantClient = None
+_reranker: CrossEncoder = None
 
 
 def get_model() -> SentenceTransformer:
@@ -61,6 +69,16 @@ def get_client() -> QdrantClient:
     if _client is None:
         _client = QdrantClient(QDRANT_HOST, port=QDRANT_PORT)
     return _client
+
+
+def get_reranker() -> CrossEncoder:
+    """Load cross-encoder reranker model (lazy loading)."""
+    global _reranker
+    if not RERANKER_AVAILABLE:
+        return None
+    if _reranker is None:
+        _reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+    return _reranker
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -161,6 +179,7 @@ def query():
     question = (data.get("question") or "").strip()
     collection = (data.get("collection") or DEFAULT_COLLECTION).strip()
     top_k = int(data.get("top_k", 5))
+    use_rerank = bool(data.get("use_rerank", False))
 
     if not question:
         return jsonify({"error": "Question cannot be empty."}), 400
@@ -168,7 +187,14 @@ def query():
     try:
         model = get_model()
         client = get_client()
-        chunks = search_similar_chunks(question, model, client, collection, top_k)
+        
+        # Load reranker if requested
+        reranker = get_reranker() if use_rerank else None
+        
+        chunks = search_similar_chunks(
+            question, model, client, collection, 
+            top_k=top_k, reranker=reranker
+        )
         prompt = build_prompt(question, chunks)
 
         return jsonify({
@@ -176,6 +202,7 @@ def query():
             "collection": collection,
             "chunks": chunks,
             "prompt": prompt,
+            "reranked": use_rerank and reranker is not None,
         })
 
     except Exception as e:
