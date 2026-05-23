@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RAG — Busca Semântica</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: #0f1117;
+        color: #e2e8f0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        background: #1a1d27;
+        border-bottom: 1px solid #2d3148;
+        padding: 1rem 2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      header h1 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #a78bfa;
+      }
+      header span {
+        font-size: 0.8rem;
+        color: #64748b;
+        background: #1e2130;
+        padding: 2px 8px;
+        border-radius: 4px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        flex: 1;
+        gap: 0;
+      }
+
+      /* ── Painel Esquerdo ── */
+      .sidebar {
+        background: #13161f;
+        border-right: 1px solid #2d3148;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        overflow-y: auto;
+      }
+
+      .section-title {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 0.75rem;
+      }
+
+      label {
+        font-size: 0.85rem;
+        color: #94a3b8;
+        display: block;
+        margin-bottom: 0.3rem;
+      }
+
+      input[type="text"],
+      input[type="number"],
+      select {
+        width: 100%;
+        background: #1a1d27;
+        border: 1px solid #2d3148;
+        color: #e2e8f0;
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      input:focus,
+      select:focus {
+        border-color: #7c3aed;
+      }
+
+      .upload-area {
+        border: 2px dashed #2d3148;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+        position: relative;
+      }
+      .upload-area:hover,
+      .upload-area.drag {
+        border-color: #7c3aed;
+        background: #1a1d27;
+      }
+      .upload-area input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+      }
+      .upload-area .upload-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+      .upload-area p {
+        font-size: 0.8rem;
+        color: #64748b;
+      }
+      .upload-area .file-name {
+        font-size: 0.8rem;
+        color: #a78bfa;
+        margin-top: 0.4rem;
+        font-weight: 500;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.6rem 1rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition:
+          opacity 0.2s,
+          transform 0.1s;
+        width: 100%;
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: #7c3aed;
+        color: #fff;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: #6d28d9;
+      }
+      .btn-danger {
+        background: #991b1b;
+        color: #fca5a5;
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: #7f1d1d;
+      }
+
+      .collections-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+      }
+      .col-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #1a1d27;
+        border: 1px solid #2d3148;
+        border-radius: 6px;
+        padding: 0.45rem 0.75rem;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: border-color 0.15s;
+      }
+      .col-item:hover {
+        border-color: #7c3aed;
+      }
+      .col-item.active {
+        border-color: #7c3aed;
+        background: #1e1535;
+        color: #a78bfa;
+      }
+      .col-item .del-btn {
+        background: none;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        font-size: 0.9rem;
+        padding: 0 2px;
+      }
+      .col-item .del-btn:hover {
+        color: #f87171;
+      }
+
+      /* ── Painel Direito ── */
+      .main {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .query-bar {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #2d3148;
+        background: #13161f;
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-end;
+      }
+      .query-bar textarea {
+        flex: 1;
+        background: #1a1d27;
+        border: 1px solid #2d3148;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 0.65rem 1rem;
+        font-size: 0.9rem;
+        resize: none;
+        outline: none;
+        transition: border-color 0.2s;
+        font-family: inherit;
+        line-height: 1.5;
+        min-height: 56px;
+      }
+      .query-bar textarea:focus {
+        border-color: #7c3aed;
+      }
+      .query-bar .btn {
+        width: auto;
+        padding: 0.65rem 1.25rem;
+        white-space: nowrap;
+      }
+
+      .results {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+
+      .empty-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #334155;
+        gap: 0.75rem;
+        text-align: center;
+      }
+      .empty-state .icon {
+        font-size: 3rem;
+      }
+      .empty-state p {
+        font-size: 0.9rem;
+        max-width: 320px;
+        line-height: 1.6;
+      }
+
+      .result-meta {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.78rem;
+        color: #64748b;
+      }
+      .result-meta strong {
+        color: #a78bfa;
+      }
+
+      .chunk-card {
+        background: #1a1d27;
+        border: 1px solid #2d3148;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .chunk-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.6rem 1rem;
+        background: #1e2130;
+        border-bottom: 1px solid #2d3148;
+        font-size: 0.78rem;
+        color: #64748b;
+      }
+      .chunk-score {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .score-bar {
+        width: 80px;
+        height: 6px;
+        background: #2d3148;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .score-fill {
+        height: 100%;
+        background: #7c3aed;
+        border-radius: 3px;
+        transition: width 0.3s;
+      }
+      .chunk-body {
+        padding: 0.9rem 1rem;
+        font-size: 0.875rem;
+        line-height: 1.7;
+        color: #cbd5e1;
+      }
+
+      .prompt-section {
+        background: #0d1015;
+        border: 1px solid #2d3148;
+        border-radius: 8px;
+      }
+      .prompt-section summary {
+        padding: 0.7rem 1rem;
+        cursor: pointer;
+        font-size: 0.82rem;
+        color: #64748b;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .prompt-section summary:hover {
+        color: #94a3b8;
+      }
+      .prompt-body {
+        padding: 1rem;
+        font-family: monospace;
+        font-size: 0.8rem;
+        color: #94a3b8;
+        white-space: pre-wrap;
+        word-break: break-word;
+        border-top: 1px solid #2d3148;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      /* ── Toast ── */
+      #toast {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        background: #1e2130;
+        border: 1px solid #2d3148;
+        border-radius: 8px;
+        padding: 0.75rem 1.25rem;
+        font-size: 0.85rem;
+        display: none;
+        z-index: 999;
+        max-width: 320px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+      }
+      #toast.show {
+        display: block;
+        animation: fadein 0.2s;
+      }
+      #toast.success {
+        border-color: #16a34a;
+        color: #86efac;
+      }
+      #toast.error {
+        border-color: #991b1b;
+        color: #fca5a5;
+      }
+      #toast.info {
+        border-color: #1d4ed8;
+        color: #93c5fd;
+      }
+      @keyframes fadein {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* ── Spinner ── */
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        display: none;
+      }
+      .spinner.active {
+        display: inline-block;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>RAG — Busca Semântica</h1>
+      <span>Qdrant + Sentence Transformers</span>
+    </header>
+
+    <div class="layout">
+      <!-- ── Sidebar ── -->
+      <aside class="sidebar">
+        <!-- Collections -->
+        <div>
+          <div class="section-title">Collections</div>
+          <div id="collections-list" class="collections-list">
+            <div style="font-size: 0.8rem; color: #334155">Carregando...</div>
+          </div>
+          <div
+            style="
+              margin-top: 0.75rem;
+              display: flex;
+              gap: 0.5rem;
+              align-items: center;
+            "
+          >
+            <input
+              type="text"
+              id="new-collection"
+              placeholder="nova-collection"
+              style="flex: 1"
+            />
+            <button
+              class="btn btn-primary"
+              style="width: auto; padding: 0.5rem 0.75rem"
+              onclick="setCollection()"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <!-- Upload -->
+        <div>
+          <div class="section-title">Ingerir Documento</div>
+          <div class="upload-area" id="upload-area">
+            <div class="upload-icon">📄</div>
+            <p>Clique ou arraste um arquivo aqui</p>
+            <p style="font-size: 0.72rem; color: #475569; margin-top: 0.25rem">
+              PDF, TXT ou MD
+            </p>
+            <div class="file-name" id="file-name"></div>
+            <input
+              type="file"
+              id="file-input"
+              accept=".pdf,.txt,.md"
+              onchange="onFileChange(this)"
+            />
+          </div>
+          <div style="margin-top: 0.75rem">
+            <label>Modo de corte</label>
+            <select id="chunk-mode" onchange="onChunkModeChange(this.value)">
+              <option value="size">Por tamanho (caracteres)</option>
+              <option value="paragraph">Por parágrafos</option>
+              <option value="semantic">Semântico (por similaridade)</option>
+            </select>
+          </div>
+          <div id="max-length-row" style="margin-top: 0.75rem">
+            <label>Tamanho máx. trecho</label>
+            <input
+              type="number"
+              id="max-length"
+              value="400"
+              min="100"
+              max="2000"
+            />
+          </div>
+          <div
+            id="semantic-params-row"
+            style="margin-top: 0.75rem; display: none"
+          >
+            <div style="margin-bottom: 0.5rem">
+              <label>Tipo de threshold</label>
+              <select id="breakpoint-type">
+                <option value="percentile">Percentil (0–100)</option>
+                <option value="standard_deviation">Desvio padrão</option>
+                <option value="interquartile">Interquartil</option>
+              </select>
+            </div>
+            <div>
+              <label>Valor do threshold</label>
+              <input
+                type="number"
+                id="breakpoint-amount"
+                value="95"
+                min="0"
+                step="any"
+                title="Percentil: 0–100 | Desvio padrão / Interquartil: valor positivo"
+              />
+            </div>
+          </div>
+          <div
+            style="
+              margin-top: 0.75rem;
+              display: flex;
+              align-items: center;
+              gap: 0.5rem;
+            "
+          >
+            <button
+              class="btn btn-primary"
+              id="btn-upload"
+              onclick="uploadFile()"
+              disabled
+            >
+              <span class="spinner" id="spinner-upload"></span>
+              <span>Ingerir documento</span>
+            </button>
+          </div>
+          <div
+            id="upload-result"
+            style="
+              margin-top: 0.6rem;
+              font-size: 0.8rem;
+              color: #86efac;
+              display: none;
+            "
+          ></div>
+        </div>
+
+        <!-- Configurações de busca -->
+        <div>
+          <div class="section-title">Configurações de Busca</div>
+          <label>Top-K trechos</label>
+          <input type="number" id="top-k" value="5" min="1" max="20" />
+        </div>
+
+        <!-- Remover collection -->
+        <div>
+          <div class="section-title">Gerenciar</div>
+          <button class="btn btn-danger" onclick="deleteCurrentCollection()">
+            Remover collection ativa
+          </button>
+        </div>
+      </aside>
+
+      <!-- ── Main ── -->
+      <main class="main">
+        <div class="query-bar">
+          <textarea
+            id="question"
+            placeholder="Digite sua pergunta sobre o documento..."
+            rows="2"
+            onkeydown="
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                runQuery();
+              }
+            "
+          ></textarea>
+          <button class="btn btn-primary" id="btn-query" onclick="runQuery()">
+            <span class="spinner" id="spinner-query"></span>
+            <span>Buscar</span>
+          </button>
+        </div>
+
+        <div class="results" id="results">
+          <div class="empty-state">
+            <div class="icon">🔍</div>
+            <p>
+              Ingira um PDF na barra lateral e faça uma pergunta para ver os
+              trechos mais relevantes.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+      let activeCollection = "documents";
+
+      // ── Toast ───────────────────────────────────────────────
+      function toast(msg, type = "info", duration = 3500) {
+        const el = document.getElementById("toast");
+        el.textContent = msg;
+        el.className = `show ${type}`;
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.classList.remove("show"), duration);
+      }
+
+      // ── Collections ─────────────────────────────────────────
+      async function loadCollections() {
+        try {
+          const res = await fetch("/collections");
+          const data = await res.json();
+          renderCollections(data.collections || []);
+        } catch {
+          document.getElementById("collections-list").innerHTML =
+            '<div style="font-size:0.8rem;color:#ef4444">Qdrant inacessível</div>';
+        }
+      }
+
+      function renderCollections(cols) {
+        const el = document.getElementById("collections-list");
+        if (!cols.length) {
+          el.innerHTML =
+            '<div style="font-size:0.8rem;color:#334155">Nenhuma collection ainda.</div>';
+          return;
+        }
+        el.innerHTML = cols
+          .map(
+            (c) => `
+      <div class="col-item ${c === activeCollection ? "active" : ""}" onclick="selectCollection('${c}')">
+        <span>📦 ${c}</span>
+        <button class="del-btn" title="Remover" onclick="event.stopPropagation();deleteCollection('${c}')">✕</button>
+      </div>`,
+          )
+          .join("");
+      }
+
+      function selectCollection(name) {
+        activeCollection = name;
+        loadCollections();
+        toast(`Collection ativa: ${name}`, "info");
+      }
+
+      function setCollection() {
+        const val = document.getElementById("new-collection").value.trim();
+        if (val) {
+          activeCollection = val;
+          loadCollections();
+          toast(`Collection definida: ${val}`, "info");
+        }
+      }
+
+      async function deleteCollection(name) {
+        if (!confirm(`Remover collection "${name}"?`)) return;
+        const res = await fetch("/collection", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ collection: name }),
+        });
+        const data = await res.json();
+        if (data.error) {
+          toast(data.error, "error");
+          return;
+        }
+        toast(data.message, "success");
+        if (activeCollection === name) activeCollection = "documents";
+        loadCollections();
+      }
+
+      function deleteCurrentCollection() {
+        deleteCollection(activeCollection);
+      }
+
+      // ── Upload ──────────────────────────────────────────────
+      function onFileChange(input) {
+        const file = input.files[0];
+        if (file) {
+          document.getElementById("file-name").textContent = file.name;
+          document.getElementById("btn-upload").disabled = false;
+        }
+      }
+
+      // Drag & drop
+      const uploadArea = document.getElementById("upload-area");
+      uploadArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        uploadArea.classList.add("drag");
+      });
+      uploadArea.addEventListener("dragleave", () =>
+        uploadArea.classList.remove("drag"),
+      );
+      uploadArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove("drag");
+        const file = e.dataTransfer.files[0];
+        const allowed = [".pdf", ".txt", ".md"];
+        const ok =
+          file && allowed.some((ext) => file.name.toLowerCase().endsWith(ext));
+        if (ok) {
+          document.getElementById("file-input").files = e.dataTransfer.files;
+          onFileChange(document.getElementById("file-input"));
+        } else {
+          toast("Formatos aceitos: PDF, TXT, MD.", "error");
+        }
+      });
+
+      async function uploadFile() {
+        const fileInput = document.getElementById("file-input");
+        if (!fileInput.files.length) {
+          toast("Selecione um arquivo PDF.", "error");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+        formData.append("collection", activeCollection);
+        formData.append(
+          "max_length",
+          document.getElementById("max-length").value,
+        );
+        formData.append(
+          "chunk_mode",
+          document.getElementById("chunk-mode").value,
+        );
+        const mode = document.getElementById("chunk-mode").value;
+        if (mode === "semantic") {
+          formData.append(
+            "breakpoint_threshold_type",
+            document.getElementById("breakpoint-type").value,
+          );
+          formData.append(
+            "breakpoint_threshold_amount",
+            document.getElementById("breakpoint-amount").value,
+          );
+        }
+
+        setBusy("upload", true);
+        document.getElementById("upload-result").style.display = "none";
+
+        try {
+          const res = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            toast(data.error, "error");
+            return;
+          }
+
+          const existNote = data.collection_existed
+            ? " (adicionado à collection existente)"
+            : " (nova collection criada)";
+          const msg = `✅ ${data.chunks} trechos ingeridos na collection "${data.collection}"${existNote}`;
+          document.getElementById("upload-result").textContent = msg;
+          document.getElementById("upload-result").style.display = "block";
+          toast(msg, "success", 5000);
+          loadCollections();
+        } catch (e) {
+          toast("Erro na requisição: " + e.message, "error");
+        } finally {
+          setBusy("upload", false);
+        }
+      }
+
+      // ── Query ───────────────────────────────────────────────
+      async function runQuery() {
+        const question = document.getElementById("question").value.trim();
+        if (!question) {
+          toast("Digite uma pergunta.", "error");
+          return;
+        }
+
+        const topK = parseInt(document.getElementById("top-k").value) || 5;
+
+        setBusy("query", true);
+
+        try {
+          const res = await fetch("/query", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              question,
+              collection: activeCollection,
+              top_k: topK,
+            }),
+          });
+          const data = await res.json();
+          if (data.error) {
+            toast(data.error, "error");
+            return;
+          }
+          renderResults(data);
+        } catch (e) {
+          toast("Erro na requisição: " + e.message, "error");
+        } finally {
+          setBusy("query", false);
+        }
+      }
+
+      function renderResults({ question, collection, chunks, prompt }) {
+        const el = document.getElementById("results");
+
+        const chunksHTML = chunks
+          .map((c, i) => {
+            const pct = Math.round(c.score * 100);
+            return `
+        <div class="chunk-card">
+          <div class="chunk-header">
+            <span>Trecho ${i + 1} de ${chunks.length}</span>
+            <div class="chunk-score">
+              <span style="color:#a78bfa;font-weight:600">${pct}%</span>
+              <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
+              <span>relevância</span>
+            </div>
+          </div>
+          <div class="chunk-body">${escHtml(c.text)}</div>
+        </div>`;
+          })
+          .join("");
+
+        el.innerHTML = `
+      <div class="result-meta">
+        <span>Pergunta: <strong>${escHtml(question)}</strong></span>
+        <span>Collection: <strong>${escHtml(collection)}</strong></span>
+        <span>${chunks.length} trechos encontrados</span>
+      </div>
+      ${chunksHTML}
+      <details class="prompt-section">
+        <summary>🧠 Ver prompt gerado para a IA</summary>
+        <div class="prompt-body">${escHtml(prompt)}</div>
+      </details>`;
+      }
+
+      // ── Helpers ─────────────────────────────────────────────
+      function setBusy(which, busy) {
+        document
+          .getElementById(`spinner-${which}`)
+          .classList.toggle("active", busy);
+        document.getElementById(`btn-${which}`).disabled = busy;
+      }
+
+      function escHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      // ── Chunk mode toggle ────────────────────────────────────
+      function onChunkModeChange(mode) {
+        document.getElementById("max-length-row").style.display =
+          mode === "size" ? "" : "none";
+        document.getElementById("semantic-params-row").style.display =
+          mode === "semantic" ? "" : "none";
+      }
+
+      // ── Init ────────────────────────────────────────────────
+      loadCollections();
+      setInterval(loadCollections, 15000);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,47 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# VSCode
+.vscode/
+
+# Node
+node_modules/
+
+# Mac/Linux
+.DS_Store
+*.swp
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.pid
+
+# Testes
+htmlcov/
+.coverage
+
+# Qdrant (se usar volumes locais)
+data/
+
+# Arquivos de ambiente
+.env
+.env.*
+
+# Outros
+*.bak
+*.orig
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Arquivos de build
+build/
+dist/
+*.egg-info/
+
+# Docker
+*.tar
