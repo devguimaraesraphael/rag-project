@@ -554,7 +554,18 @@
         <div>
           <div class="section-title">Search Settings</div>
           <label>Top-K Chunks</label>
-          <input type="number" id="top-k" value="5" min="1" max="20" />
+          <input 
+            type="number" 
+            id="top-k" 
+            value="5" 
+            min="1" 
+            max="100"
+            step="1"
+            oninput="this.value = Math.max(1, Math.min(100, parseInt(this.value) || 5))"
+          />
+          <p style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">
+            Number of chunks to return (1-100)
+          </p>
 
           <div style="margin-top: 0.75rem">
             <label
@@ -803,10 +814,33 @@
           return;
         }
 
-        const topK = parseInt(document.getElementById("top-k").value) || 5;
+        let topK = parseInt(document.getElementById("top-k").value);
+        
+        // Validate and sanitize top_k
+        if (isNaN(topK) || topK < 1) {
+          topK = 5;
+          document.getElementById("top-k").value = 5;
+          toast("Top-K value must be at least 1. Reset to 5.", "error");
+          return;
+        }
+        if (topK > 100) {
+          topK = 100;
+          document.getElementById("top-k").value = 100;
+          toast("Top-K limited to 100.", "error");
+          return;
+        }
+        
         const useRerank = document.getElementById("use-rerank").checked;
+        
+        console.log(`[runQuery] top_k=${topK}, use_rerank=${useRerank}`);
 
         setBusy("query", true);
+        
+        // Show progress message
+        const progressMsg = useRerank 
+          ? `🔍 Searching top-${topK} chunks with reranking (retrieving 20 candidates)...`
+          : `🔍 Searching top-${topK} chunks...`;
+        toast(progressMsg, "info", 2000);
 
         try {
           const res = await fetch("/query", {
@@ -820,24 +854,39 @@
             }),
           });
           const data = await res.json();
+          
+          console.log(`[runQuery] Response:`, data);
+          console.log(`[runQuery] Received ${data.chunks ? data.chunks.length : 0} chunks`);
+          
           if (data.error) {
             toast(data.error, "error");
             return;
           }
+          
+          // Success feedback
+          const resultMsg = data.reranked 
+            ? `✓ Found ${data.chunks.length} chunks (reranked from 20 candidates)`
+            : `✓ Found ${data.chunks.length} chunks`;
+          toast(resultMsg, "success", 3000);
+          
           renderResults(data);
         } catch (e) {
+          console.error("[runQuery] Error:", e);
           toast("Request error: " + e.message, "error");
         } finally {
           setBusy("query", false);
         }
       }
 
-      function renderResults({ question, collection, chunks, prompt }) {
+      function renderResults({ question, collection, chunks, prompt, reranked }) {
         const el = document.getElementById("results");
 
         const chunksHTML = chunks
           .map((c, i) => {
             const pct = Math.round(c.score * 100);
+            const hasOriginal = c.original_score !== undefined;
+            const originalPct = hasOriginal ? Math.round(c.original_score * 100) : null;
+            
             return `
         <div class="chunk-card">
           <div class="chunk-header">
@@ -845,7 +894,7 @@
             <div class="chunk-score">
               <span style="color:#a78bfa;font-weight:600">${pct}%</span>
               <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
-              <span>relevance</span>
+              <span>relevance${hasOriginal ? ` (was ${originalPct}%)` : ''}</span>
             </div>
           </div>
           <div class="chunk-body">${escHtml(c.text)}</div>
@@ -853,11 +902,15 @@
           })
           .join("");
 
+        const rerankBadge = reranked 
+          ? '<span style="background:#10b981;color:white;padding:2px 6px;border-radius:3px;font-size:0.7rem;margin-left:8px">RERANKED</span>'
+          : '';
+
         el.innerHTML = `
       <div class="result-meta">
         <span>Question: <strong>${escHtml(question)}</strong></span>
         <span>Collection: <strong>${escHtml(collection)}</strong></span>
-        <span>${chunks.length} chunks found</span>
+        <span>${chunks.length} chunks found${rerankBadge}</span>
       </div>
       ${chunksHTML}
       <details class="prompt-section">

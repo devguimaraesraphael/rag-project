@@ -191,10 +191,15 @@ def query():
         # Load reranker if requested
         reranker = get_reranker() if use_rerank else None
         
+        print(f"[QUERY] top_k={top_k}, use_rerank={use_rerank}, reranker={'loaded' if reranker else 'None'}")
+        
         chunks = search_similar_chunks(
             question, model, client, collection, 
             top_k=top_k, reranker=reranker
         )
+        
+        print(f"[QUERY] Returned {len(chunks)} chunks (expected {top_k})")
+        
         prompt = build_prompt(question, chunks)
 
         return jsonify({
@@ -206,6 +211,7 @@ def query():
         })
 
     except Exception as e:
+        print(f"[QUERY ERROR] {e}")
         return jsonify({"error": str(e)}), 500
 
 

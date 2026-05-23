@@ -96,6 +96,8 @@ def search_similar_chunks(
     # Retrieve more candidates if reranking is enabled
     limit = retrieve_k if reranker else top_k
     
+    print(f"[search_similar_chunks] top_k={top_k}, limit={limit}, reranker={'enabled' if reranker else 'disabled'}")
+    
     results = client.search(
         collection_name=collection_name,
         query_vector=embedding,
@@ -104,9 +106,12 @@ def search_similar_chunks(
 
     chunks = [{"text": hit.payload["text"], "score": hit.score} for hit in results]
     
+    print(f"[search_similar_chunks] Retrieved {len(chunks)} chunks from Qdrant")
+    
     # Apply reranking if enabled
     if reranker:
         chunks = rerank_chunks(question, chunks, reranker, top_k)
+        print(f"[search_similar_chunks] After reranking: {len(chunks)} chunks (expected {top_k})")
     
     return chunks
 
