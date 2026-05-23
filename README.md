@@ -1,52 +1,52 @@
-# RAG Project — Sistema de Embeddings com Banco Vetorial e Integração IA
+# RAG Project — Semantic Embedding System with Vector Database and AI Integration
 
-Sistema completo de RAG (Retrieval-Augmented Generation) que ingere PDFs/livros, gera embeddings semânticos, armazena no Qdrant e responde perguntas com contexto recuperado por similaridade.
+A complete RAG (Retrieval-Augmented Generation) system that ingests PDFs/books, generates semantic embeddings, stores in Qdrant, and answers questions with context retrieved by similarity.
 
 ---
 
-## Estrutura
+## Structure
 
 ```
 rag-project/
 ├── src/
-│   ├── app.py           # Interface web Flask
-│   ├── ingest.py        # Extrai PDF, divide em trechos, gera embeddings e salva no Qdrant
-│   ├── query.py         # Busca contexto no Qdrant e gera prompt para IA
+│   ├── app.py           # Flask web interface
+│   ├── ingest.py        # Extracts PDF, splits into chunks, generates embeddings and saves to Qdrant
+│   ├── query.py         # Searches context in Qdrant and generates prompt for AI
 │   └── templates/
-│       └── index.html   # Frontend da interface web
+│       └── index.html   # Frontend of the web interface
 ├── scripts/
-│   ├── start.sh                 # Inicialização completa (venv + Qdrant + testes + web)
-│   ├── stop.sh                  # Encerra servidor web e Qdrant
-│   ├── run_web.sh               # Inicia apenas a interface web Flask
-│   ├── install_dependencies.sh  # Instala dependências Python
-│   ├── start_qdrant.sh          # Sobe o Qdrant via Docker
-│   ├── run_ingest.sh            # Executa a ingestão de um PDF
-│   └── run_query.sh             # Inicia o loop de perguntas e respostas
+│   ├── start.sh                 # Complete initialization (venv + Qdrant + tests + web)
+│   ├── stop.sh                  # Stops web server and Qdrant
+│   ├── run_web.sh               # Starts only the Flask web interface
+│   ├── install_dependencies.sh  # Installs Python dependencies
+│   ├── start_qdrant.sh          # Starts Qdrant via Docker
+│   ├── run_ingest.sh            # Executes ingestion of a PDF
+│   └── run_query.sh             # Starts the question and answer loop
 ├── tests/
-│   └── test_rag.py      # Testes unitários dos componentes principais
+│   └── test_rag.py      # Unit tests of the main components
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## Pré-requisitos
+## Prerequisites
 
 - Python 3.8+
-- Docker (para rodar o Qdrant)
+- Docker (to run Qdrant)
 
 ---
 
-## Início Rápido
+## Quick Start
 
 ```bash
-# Inicializa tudo: venv, dependências, Qdrant, testes e interface web
+# Initializes everything: venv, dependencies, Qdrant, tests, and web interface
 bash scripts/start.sh
 ```
 
-Acesse a interface em **http://localhost:5000** e o painel do Qdrant em **http://localhost:6333/dashboard**.
+Access the interface at **http://localhost:5000** and the Qdrant dashboard at **http://localhost:6333/dashboard**.
 
-Para encerrar:
+To stop:
 
 ```bash
 bash scripts/stop.sh
@@ -54,56 +54,56 @@ bash scripts/stop.sh
 
 ---
 
-## Instalação Manual
+## Manual Installation
 
 ```bash
-# 1. Instale as dependências Python
+# 1. Install Python dependencies
 bash scripts/install_dependencies.sh
 
-# 2. Suba o banco vetorial Qdrant
+# 2. Start the Qdrant vector database
 bash scripts/start_qdrant.sh
 ```
 
 ---
 
-## Uso
+## Usage
 
-### Interface Web
+### Web Interface
 
 ```bash
-# Via script de inicialização completa (recomendado)
+# Via complete initialization script (recommended)
 bash scripts/start.sh
 
-# Ou apenas a interface web (Qdrant já deve estar rodando)
+# Or just the web interface (Qdrant must already be running)
 bash scripts/run_web.sh
-# Com porta customizada:
+# With custom port:
 bash scripts/run_web.sh 8080
 ```
 
-### Ingerir um PDF
+### Ingest a PDF
 
 ```bash
-bash scripts/run_ingest.sh caminho/para/livro.pdf
-# Ou com parâmetros customizados:
-bash scripts/run_ingest.sh livro.pdf minha_collection 500
+bash scripts/run_ingest.sh path/to/book.pdf
+# Or with custom parameters:
+bash scripts/run_ingest.sh book.pdf my_collection 500
 ```
 
-### Fazer perguntas (CLI)
+### Ask Questions (CLI)
 
 ```bash
 bash scripts/run_query.sh
-# Ou com parâmetros customizados:
-bash scripts/run_query.sh minha_collection 10
+# Or with custom parameters:
+bash scripts/run_query.sh my_collection 10
 ```
 
 ---
 
-## Integrar com um modelo de IA
+## Integrate with an AI Model
 
-Em `src/query.py`, substitua a função `default_ai_model` pela integração com o modelo de sua escolha:
+In `src/query.py`, replace the `default_ai_model` function with integration to your model of choice:
 
 ```python
-# Exemplo com OpenAI
+# Example with OpenAI
 import openai
 
 def openai_model(prompt: str) -> str:
@@ -114,7 +114,7 @@ def openai_model(prompt: str) -> str:
     return response.choices[0].message.content
 ```
 
-Passe a função ao chamar `query_loop`:
+Pass the function when calling `query_loop`:
 
 ```python
 query_loop(collection_name, top_k, ai_model_fn=openai_model)
@@ -122,7 +122,7 @@ query_loop(collection_name, top_k, ai_model_fn=openai_model)
 
 ---
 
-## Testes
+## Tests
 
 ```bash
 python -m pytest tests/test_rag.py -v
@@ -130,13 +130,13 @@ python -m pytest tests/test_rag.py -v
 
 ---
 
-## Checklist de Qualidade
+## Quality Checklist
 
-- [ ] Qdrant está rodando (`docker ps`)
-- [ ] Dependências instaladas (`pip list`)
-- [ ] PDF ingerido sem erros
-- [ ] Embeddings com dimensão 384
-- [ ] Busca retorna trechos relevantes
-- [ ] Prompt contém contexto e pergunta
-- [ ] Modelo de IA configurado e respondendo
-- [ ] Todos os testes passando
+- [ ] Qdrant is running (`docker ps`)
+- [ ] Dependencies installed (`pip list`)
+- [ ] PDF ingested without errors
+- [ ] Embeddings with 384 dimensions
+- [ ] Search returns relevant chunks
+- [ ] Prompt contains context and question
+- [ ] AI model configured and responding
+- [ ] All tests passing

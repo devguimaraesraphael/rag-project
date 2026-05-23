@@ -5,10 +5,10 @@ COLLECTION="${2:-documents}"
 MAX_LENGTH="${3:-400}"
 
 if [ -z "$PDF" ]; then
-  echo "Uso: ./scripts/run_ingest.sh caminho/para/arquivo.pdf [collection] [max_length]"
+  echo "Usage: ./scripts/run_ingest.sh path/to/file.pdf [collection] [max_length]"
   exit 1
 fi
 
 cd "$(dirname "$0")/.."
-echo "Iniciando ingestão do arquivo: $PDF"
+echo "Starting ingestion of file: $PDF"
 .venv/bin/python src/ingest.py --pdf "$PDF" --collection "$COLLECTION" --max-length "$MAX_LENGTH"

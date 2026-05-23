@@ -20,123 +20,123 @@ echo -e "║   RAG Project — Startup             ║"
 echo -e "╚══════════════════════════════════════╝${RESET}\n"
 
 # ─── 1. Python ───────────────────────────────────────────────────────────────
-step "1/5  Ambiente Python"
+step "1/5  Python Environment"
 
 if [ ! -d ".venv" ]; then
-  info "Criando ambiente virtual..."
-  python3 -m venv .venv || fail "Falha ao criar venv. Instale python3-venv: sudo apt install python3.12-venv"
-  ok "Venv criado"
+  info "Creating virtual environment..."
+  python3 -m venv .venv || fail "Failed to create venv. Install python3-venv: sudo apt install python3.12-venv"
+  ok "Venv created"
 else
-  ok "Venv já existe"
+  ok "Venv already exists"
 fi
 
-info "Instalando dependências..."
+info "Installing dependencies..."
 .venv/bin/pip install -r requirements.txt -q \
   && .venv/bin/pip install pytest -q \
-  && ok "Dependências instaladas" \
-  || fail "Erro ao instalar dependências"
+  && ok "Dependencies installed" \
+  || fail "Error installing dependencies"
 
 # ─── 2. Qdrant ───────────────────────────────────────────────────────────────
-step "2/5  Banco Vetorial (Qdrant)"
+step "2/5  Vector Database (Qdrant)"
 
 if ! command -v docker &>/dev/null; then
-  warn "Docker não encontrado. Qdrant não será iniciado automaticamente."
-  warn "Instale Docker ou inicie o Qdrant manualmente antes de usar a interface."
+  warn "Docker not found. Qdrant will not be started automatically."
+  warn "Install Docker or start Qdrant manually before using the interface."
 else
   if docker ps --format '{{.Names}}' | grep -q '^qdrant$'; then
-    ok "Qdrant já está rodando"
+    ok "Qdrant is already running"
   elif docker ps -a --format '{{.Names}}' | grep -q '^qdrant$'; then
-    info "Reiniciando container Qdrant existente..."
+    info "Restarting existing Qdrant container..."
     docker start qdrant > /dev/null
-    ok "Qdrant iniciado"
+    ok "Qdrant started"
   else
-    info "Baixando e iniciando Qdrant..."
+    info "Pulling and starting Qdrant..."
     docker run -d --name qdrant -p 6333:6333 qdrant/qdrant > /dev/null
-    ok "Qdrant iniciado"
+    ok "Qdrant started"
   fi
 
-  # Aguarda Qdrant estar pronto
-  info "Aguardando Qdrant ficar pronto..."
+  # Wait for Qdrant to be ready
+  info "Waiting for Qdrant to be ready..."
   for i in $(seq 1 15); do
     if curl -sf http://localhost:6333/healthz > /dev/null 2>&1; then
-      ok "Qdrant respondendo em http://localhost:6333"
+      ok "Qdrant responding at http://localhost:6333"
       break
     fi
     sleep 1
     if [ "$i" -eq 15 ]; then
-      warn "Qdrant demorou mais que o esperado. Continue mesmo assim."
+      warn "Qdrant took longer than expected. Continue anyway."
     fi
   done
 fi
 
-# ─── 3. Testes ───────────────────────────────────────────────────────────────
-step "3/5  Testes Unitários"
+# ─── 3. Tests ────────────────────────────────────────────────────────────────
+step "3/5  Unit Tests"
 
-info "Executando testes..."
+info "Running tests..."
 if .venv/bin/python -m pytest tests/test_rag.py -v --tb=short 2>&1 | tee /tmp/rag_test_output.txt | grep -E "PASSED|FAILED|ERROR|passed|failed|error" ; then
   if grep -q "failed\|error" /tmp/rag_test_output.txt; then
-    fail "Alguns testes falharam. Verifique os erros acima antes de continuar."
+    fail "Some tests failed. Check the errors above before continuing."
   else
-    ok "Todos os testes passaram"
+    ok "All tests passed"
   fi
 else
-  fail "Erro ao executar os testes."
+  fail "Error running tests."
 fi
 
 # ─── 4. Interface Web ─────────────────────────────────────────────────────────
-step "4/5  Interface Web"
+step "4/5  Web Interface"
 
 PORT="${PORT:-5000}"
 
-# Mata processo anterior se existir
+# Kill previous process if exists
 OLD_PID=$(lsof -ti tcp:$PORT 2>/dev/null || true)
 if [ -n "$OLD_PID" ]; then
-  info "Encerrando processo anterior na porta $PORT (PID $OLD_PID)..."
+  info "Killing previous process on port $PORT (PID $OLD_PID)..."
   kill "$OLD_PID" 2>/dev/null || true
   sleep 1
 fi
 
-info "Iniciando servidor Flask na porta $PORT..."
+info "Starting Flask server on port $PORT..."
 PORT=$PORT .venv/bin/python src/app.py > /tmp/rag_web.log 2>&1 &
 WEB_PID=$!
 echo $WEB_PID > /tmp/rag_web.pid
 
-# Aguarda servidor subir
+# Wait for server to start
 for i in $(seq 1 10); do
   if curl -sf http://localhost:$PORT/ > /dev/null 2>&1; then
-    ok "Servidor web rodando (PID $WEB_PID)"
+    ok "Web server running (PID $WEB_PID)"
     break
   fi
   sleep 1
   if [ "$i" -eq 10 ]; then
     echo ""
-    warn "Servidor demorou para responder. Verifique: tail -f /tmp/rag_web.log"
+    warn "Server took too long to respond. Check: tail -f /tmp/rag_web.log"
   fi
 done
 
 # ─── 5. Abrir browser ─────────────────────────────────────────────────────────
-step "5/5  Abrindo Interface"
+step "5/5  Opening Interface"
 
 URL="http://localhost:$PORT"
-info "Abrindo $URL no browser..."
+info "Opening $URL in browser..."
 
 if command -v xdg-open &>/dev/null; then
   xdg-open "$URL" &>/dev/null &
 elif command -v open &>/dev/null; then
   open "$URL"
 else
-  warn "Não foi possível abrir o browser automaticamente."
+  warn "Could not open browser automatically."
 fi
 
-# ─── Resumo ───────────────────────────────────────────────────────────────────
+# ─── Summary ─────────────────────────────────────────────────────────────────
 echo -e "\n${BOLD}${GREEN}╔══════════════════════════════════════╗"
-echo -e "║   Tudo pronto!                       ║"
+echo -e "║   All set!                          ║"
 echo -e "╚══════════════════════════════════════╝${RESET}"
-echo -e "\n  Interface Web : ${CYAN}${URL}${RESET}"
-echo -e "  Qdrant UI     : ${CYAN}http://localhost:6333/dashboard${RESET}"
-echo -e "  Logs web      : tail -f /tmp/rag_web.log"
-echo -e "  Parar tudo    : bash scripts/stop.sh\n"
+echo -e "\n  Web Interface : ${CYAN}${URL}${RESET}"
+echo -e "  Qdrant UI    : ${CYAN}http://localhost:6333/dashboard${RESET}"
+echo -e "  Web logs     : tail -f /tmp/rag_web.log"
+echo -e "  Stop all     : bash scripts/stop.sh\n"
 
-# Mantém script ativo e exibe logs da interface
-trap "kill $WEB_PID 2>/dev/null; echo -e '\n${YELLOW}Servidor encerrado.${RESET}'; exit 0" INT TERM
+# Keep script active and show web logs
+trap "kill $WEB_PID 2>/dev/null; echo -e '\n${YELLOW}Web server stopped.${RESET}\n'; exit 0" INT TERM
 wait $WEB_PID

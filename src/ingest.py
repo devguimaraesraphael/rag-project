@@ -1,9 +1,9 @@
 """
-ingest.py — Extrai texto de documentos (PDF, TXT, MD), divide em trechos,
-            gera embeddings e salva no Qdrant.
+ingest.py — Extracts text from documents (PDF, TXT, MD), splits into chunks,
+            generates embeddings and saves to Qdrant.
 
-Uso:
-    python src/ingest.py --file arquivo.pdf [--collection nome] [--max-length 400] [--chunk-mode size|paragraph]
+Usage:
+    python src/ingest.py --file file.pdf [--collection name] [--max-length 400] [--chunk-mode size|paragraph]
 """
 
 import argparse
@@ -32,14 +32,14 @@ CHUNK_MODE_SEMANTIC = "semantic"
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
 
 
-# ─── Extratores de texto ──────────────────────────────────────────────────────
+# ─── Text extractors ──────────────────────────────────────────────────────
 
 def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extrai o texto completo de um arquivo PDF, preservando a ordem das páginas."""
+    """Extracts full text from a PDF file, preserving page order."""
     try:
         reader = PdfReader(pdf_path)
     except Exception as e:
-        raise RuntimeError(f"Erro ao abrir o PDF '{pdf_path}': {e}")
+        raise RuntimeError(f"Error opening PDF '{pdf_path}': {e}")
 
     pages_text: List[str] = []
     for page in reader.pages:
@@ -48,24 +48,24 @@ def extract_text_from_pdf(pdf_path: str) -> str:
             pages_text.append(text)
 
     if not pages_text:
-        raise ValueError(f"Nenhum texto extraído do PDF '{pdf_path}'.")
+        raise ValueError(f"No text extracted from PDF '{pdf_path}'.")
 
     return "\n".join(pages_text)
 
 
 def extract_text_from_txt(file_path: str) -> str:
-    """Lê o conteúdo de um arquivo de texto (TXT ou MD), tentando encodings comuns."""
+    """Reads text file content (TXT or MD), trying common encodings."""
     for encoding in ("utf-8", "latin-1", "cp1252"):
         try:
             with open(file_path, "r", encoding=encoding) as f:
                 return f.read()
         except UnicodeDecodeError:
             continue
-    raise RuntimeError(f"Não foi possível decodificar '{file_path}' em nenhum encoding suportado.")
+    raise RuntimeError(f"Could not decode '{file_path}' with any supported encoding.")
 
 
 def extract_text(file_path: str) -> str:
-    """Detecta o tipo do arquivo e extrai o texto adequadamente."""
+    """Detects file type and extracts text appropriately."""
     ext = Path(file_path).suffix.lower()
     if ext == ".pdf":
         return extract_text_from_pdf(file_path)
@@ -73,16 +73,16 @@ def extract_text(file_path: str) -> str:
         return extract_text_from_txt(file_path)
     else:
         supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
-        raise ValueError(f"Formato não suportado: '{ext}'. Use: {supported}")
+        raise ValueError(f"Unsupported format: '{ext}'. Use: {supported}")
 
 
-# ─── Adapter LangChain ──────────────────────────────────────────────────────
+# ─── LangChain adapter ─────────────────────────────────────────────────────
 
 class SentenceTransformerEmbeddingsAdapter:
-    """Adapta um SentenceTransformer para a interface Embeddings do LangChain.
+    """Adapts a SentenceTransformer to the LangChain Embeddings interface.
 
-    Permite reutilizar o modelo já carregado no projeto sem carregá-lo uma
-    segunda vez ou depender de HuggingFaceEmbeddings.
+    Allows reusing the already loaded model in the project without loading it
+    a second time or depending on HuggingFaceEmbeddings.
     """
 
     def __init__(self, model: SentenceTransformer) -> None:
@@ -97,10 +97,10 @@ class SentenceTransformerEmbeddingsAdapter:
         return vector[0].tolist()
 
 
-# ─── Estratégias de divisão ───────────────────────────────────────────────────
+# ─── Splitting strategies ─────────────────────────────────────────────────────
 
 def split_text(text: str, max_length: int = DEFAULT_MAX_LENGTH, min_length: int = DEFAULT_MIN_LENGTH) -> List[str]:
-    """Divide o texto em trechos respeitando o tamanho máximo sem cortar palavras."""
+    """Splits text into chunks respecting max length without cutting words."""
     chunks: List[str] = []
 
     for paragraph in text.split("\n"):
@@ -122,7 +122,7 @@ def split_text(text: str, max_length: int = DEFAULT_MAX_LENGTH, min_length: int 
 
 
 def split_text_by_paragraphs(text: str, min_length: int = DEFAULT_MIN_LENGTH) -> List[str]:
-    """Divide o texto em parágrafos separados por linha(s) em branco."""
+    """Splits text by paragraphs separated by blank line(s)."""
     raw = re.split(r"\n\s*\n", text)
     chunks: List[str] = []
     for para in raw:
@@ -139,21 +139,20 @@ def split_text_semantic(
     breakpoint_threshold_amount: float = 95.0,
     min_length: int = DEFAULT_MIN_LENGTH,
 ) -> List[str]:
-    """Divide o texto em chunks semânticos usando SemanticChunker do LangChain.
+    """Splits text into semantic chunks using LangChain's SemanticChunker.
 
-    Gera embeddings de cada sentença e corta onde o salto de similaridade
-    entre sentenças consecutivas ultrapassa o threshold escolhido. Os chunks
-    resultantes agrupam sentenças semanticamente relacionadas, independente
-    do número de caracteres.
+    Generates embeddings for each sentence and cuts where the similarity jump
+    between consecutive sentences exceeds the chosen threshold. The resulting
+    chunks group semantically related sentences, regardless of character count.
 
     Args:
-        text: Texto completo a dividir.
-        model: Modelo SentenceTransformer já carregado (reaproveitado via adapter).
-        breakpoint_threshold_type: Critério de corte — 'percentile',
-            'standard_deviation' ou 'interquartile'.
-        breakpoint_threshold_amount: Sensibilidade do corte. Para 'percentile',
-            use 0-100 (padrão 95); para os demais, um multiplicador positivo.
-        min_length: Descarta chunks com menos caracteres que este valor.
+        text: Full text to split.
+        model: Already loaded SentenceTransformer model (reused via adapter).
+        breakpoint_threshold_type: Cutting criterion — 'percentile',
+            'standard_deviation' or 'interquartile'.
+        breakpoint_threshold_amount: Cut sensitivity. For 'percentile',
+            use 0-100 (default 95); for others, a positive multiplier.
+        min_length: Discards chunks with fewer characters than this value.
     """
     from langchain_experimental.text_splitter import SemanticChunker
 
@@ -167,16 +166,16 @@ def split_text_semantic(
     return [c.strip() for c in raw if len(c.strip()) >= min_length]
 
 
-# ─── Qdrant helpers ───────────────────────────────────────────────────────────
+# ─── Qdrant helpers ─────────────────────────────────────────────────────────
 
 def collection_exists(client: QdrantClient, collection_name: str) -> bool:
-    """Retorna True se a collection já existe no Qdrant."""
+    """Returns True if the collection already exists in Qdrant."""
     existing = [c.name for c in client.get_collections().collections]
     return collection_name in existing
 
 
 def generate_embeddings(chunks: List[str], model: SentenceTransformer) -> List[List[float]]:
-    """Gera embeddings para cada trecho em lote com barra de progresso."""
+    """Generates embeddings for each chunk in batch with progress bar."""
     vectors = model.encode(chunks, show_progress_bar=True, convert_to_numpy=True)
     return [v.tolist() for v in vectors]
 
@@ -187,7 +186,7 @@ def save_to_qdrant(
     collection_name: str,
     client: QdrantClient,
 ) -> None:
-    """Cria a collection se necessário e salva os trechos usando upsert em lotes."""
+    """Creates collection if needed and saves chunks using upsert in batches."""
     if not collection_exists(client, collection_name):
         client.create_collection(
             collection_name=collection_name,
@@ -200,11 +199,11 @@ def save_to_qdrant(
     ]
 
     batch_size = 256
-    for start in tqdm(range(0, len(points), batch_size), desc="Salvando no Qdrant"):
+    for start in tqdm(range(0, len(points), batch_size), desc="Saving to Qdrant"):
         client.upsert(collection_name=collection_name, points=points[start : start + batch_size])
 
 
-# ─── Fluxo principal ──────────────────────────────────────────────────────────
+# ─── Main flow ────────────────────────────────────────────────────────────────
 
 def ingest(
     file_path: str,
@@ -214,15 +213,15 @@ def ingest(
     breakpoint_threshold_type: str = "percentile",
     breakpoint_threshold_amount: float = 95.0,
 ) -> None:
-    """Fluxo completo: extrai texto, divide, gera embeddings e salva no Qdrant."""
-    print(f"Extraindo texto de '{file_path}'...")
+    """Full flow: extracts text, splits, generates embeddings and saves to Qdrant."""
+    print(f"Extracting text from '{file_path}'...")
     text = extract_text(file_path)
 
-    print(f"Dividindo texto em trechos (modo: {chunk_mode})...")
+    print(f"Splitting text into chunks (mode: {chunk_mode})...")
 
     if chunk_mode == CHUNK_MODE_SEMANTIC:
-        # O modelo é necessário durante o chunking — carrega antes
-        print("Carregando modelo de embeddings para chunking semântico...")
+        # Model is needed during chunking — load it first
+        print("Loading embedding model for semantic chunking...")
         model = SentenceTransformer(EMBEDDING_MODEL)
         chunks = split_text_semantic(
             text,
@@ -237,48 +236,48 @@ def ingest(
         chunks = split_text(text, max_length=max_length)
         model = None
 
-    print(f"{len(chunks)} trechos gerados.")
+    print(f"{len(chunks)} chunks generated.")
 
     if model is None:
-        print("Carregando modelo de embeddings...")
+        print("Loading embedding model...")
         model = SentenceTransformer(EMBEDDING_MODEL)
 
-    print("Gerando embeddings...")
+    print("Generating embeddings...")
     vectors = generate_embeddings(chunks, model)
 
-    print("Conectando ao Qdrant...")
+    print("Connecting to Qdrant...")
     client = QdrantClient(QDRANT_HOST, port=QDRANT_PORT)
 
     if collection_exists(client, collection_name):
-        print(f"⚠  Collection '{collection_name}' já existe — novos trechos serão adicionados.")
-    print(f"Salvando na collection '{collection_name}'...")
+        print(f"⚠  Collection '{collection_name}' already exists — new chunks will be added.")
+    print(f"Saving to collection '{collection_name}'...")
     save_to_qdrant(chunks, vectors, collection_name, client)
 
-    print("✔  Ingestão concluída com sucesso!")
+    print("✔  Ingestion completed successfully!")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Ingere documentos (PDF, TXT, MD) no Qdrant.")
-    parser.add_argument("--file", required=True, help="Caminho para o arquivo (PDF, TXT ou MD)")
-    parser.add_argument("--collection", default=DEFAULT_COLLECTION, help="Nome da collection no Qdrant")
-    parser.add_argument("--max-length", type=int, default=DEFAULT_MAX_LENGTH, help="Tamanho máximo de cada trecho (modo size)")
+    parser = argparse.ArgumentParser(description="Ingests documents (PDF, TXT, MD) into Qdrant.")
+    parser.add_argument("--file", required=True, help="Path to file (PDF, TXT or MD)")
+    parser.add_argument("--collection", default=DEFAULT_COLLECTION, help="Collection name in Qdrant")
+    parser.add_argument("--max-length", type=int, default=DEFAULT_MAX_LENGTH, help="Max size for each chunk (size mode)")
     parser.add_argument(
         "--chunk-mode",
         choices=[CHUNK_MODE_SIZE, CHUNK_MODE_PARAGRAPH, CHUNK_MODE_SEMANTIC],
         default=CHUNK_MODE_SIZE,
-        help="Estratégia: 'size' (por tamanho), 'paragraph' (por parágrafo) ou 'semantic' (semântico)",
+        help="Strategy: 'size' (by size), 'paragraph' (by paragraph) or 'semantic' (semantic)",
     )
     parser.add_argument(
         "--breakpoint-threshold-type",
         choices=["percentile", "standard_deviation", "interquartile"],
         default="percentile",
-        help="Critério de corte para modo semantic (padrão: percentile)",
+        help="Cut criterion for semantic mode (default: percentile)",
     )
     parser.add_argument(
         "--breakpoint-threshold-amount",
         type=float,
         default=95.0,
-        help="Valor do threshold para modo semantic (padrão: 95.0)",
+        help="Threshold value for semantic mode (default: 95.0)",
     )
     args = parser.parse_args()
 
@@ -292,5 +291,5 @@ if __name__ == "__main__":
             args.breakpoint_threshold_amount,
         )
     except Exception as e:
-        print(f"Erro: {e}", file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

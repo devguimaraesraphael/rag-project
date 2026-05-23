@@ -1,12 +1,12 @@
 """
-app.py — Interface web Flask para o sistema RAG.
+app.py — Flask web interface for the RAG system.
 
-Rotas:
-  GET  /                  → página principal
-  POST /upload            → recebe PDF, ingere e salva no Qdrant
-  POST /query             → recebe pergunta, retorna trechos relevantes + prompt
-  GET  /collections       → lista collections disponíveis no Qdrant
-  DELETE /collection      → remove uma collection
+Routes:
+  GET  /                  → main page
+  POST /upload            → receives PDF, ingests and saves to Qdrant
+  POST /query             → receives question, returns relevant chunks + prompt
+  GET  /collections       → lists available collections in Qdrant
+  DELETE /collection      → removes a collection
 """
 
 import os
@@ -44,7 +44,7 @@ UPLOAD_MAX_MB = 100
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = UPLOAD_MAX_MB * 1024 * 1024
 
-# Carrega modelo e cliente uma única vez ao iniciar
+# Load model and client once at startup
 _model: SentenceTransformer = None
 _client: QdrantClient = None
 
@@ -63,7 +63,7 @@ def get_client() -> QdrantClient:
     return _client
 
 
-# ─── Rotas ───────────────────────────────────────────────────────────────────
+# ─── Routes ───────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -83,14 +83,14 @@ def list_collections():
 @app.route("/upload", methods=["POST"])
 def upload():
     if "file" not in request.files:
-        return jsonify({"error": "Nenhum arquivo enviado."}), 400
+        return jsonify({"error": "No file sent."}), 400
 
     file = request.files["file"]
     filename = file.filename or ""
     ext = os.path.splitext(filename.lower())[1]
     if ext not in SUPPORTED_EXTENSIONS:
         supported = ", ".join(sorted(SUPPORTED_EXTENSIONS))
-        return jsonify({"error": f"Formato não suportado. Use: {supported}"}), 400
+        return jsonify({"error": f"Unsupported format. Use: {supported}"}), 400
 
     collection = request.form.get("collection", DEFAULT_COLLECTION).strip()
     if not collection:
@@ -119,7 +119,7 @@ def upload():
         text = extract_text(tmp_path)
 
         if chunk_mode == CHUNK_MODE_SEMANTIC:
-            model = get_model()  # necessário durante o chunking
+            model = get_model()  # needed during chunking
             chunks = split_text_semantic(
                 text,
                 model,
@@ -132,17 +132,17 @@ def upload():
             chunks = split_text(text, max_length=max_length)
 
         if not chunks:
-            return jsonify({"error": "Nenhum trecho extraído do documento."}), 422
+            return jsonify({"error": "No chunks extracted from document."}), 422
 
         client = get_client()
         already_exists = collection_exists(client, collection)
 
-        model = get_model()  # singleton — já cached se foi carregado acima
+        model = get_model()  # singleton — already cached if loaded above
         vectors = generate_embeddings(chunks, model)
         save_to_qdrant(chunks, vectors, collection, client)
 
         return jsonify({
-            "message": f"{len(chunks)} trechos ingeridos com sucesso.",
+            "message": f"{len(chunks)} chunks ingested successfully.",
             "chunks": len(chunks),
             "collection": collection,
             "collection_existed": already_exists,
@@ -163,7 +163,7 @@ def query():
     top_k = int(data.get("top_k", 5))
 
     if not question:
-        return jsonify({"error": "Pergunta não pode ser vazia."}), 400
+        return jsonify({"error": "Question cannot be empty."}), 400
 
     try:
         model = get_model()
@@ -187,11 +187,11 @@ def delete_collection():
     data = request.get_json(force=True)
     collection = (data.get("collection") or "").strip()
     if not collection:
-        return jsonify({"error": "Nome da collection não informado."}), 400
+        return jsonify({"error": "Collection name not provided."}), 400
     try:
         client = get_client()
         client.delete_collection(collection)
-        return jsonify({"message": f"Collection '{collection}' removida."})
+        return jsonify({"message": f"Collection '{collection}' removed."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

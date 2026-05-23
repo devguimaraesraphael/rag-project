@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RAG — Busca Semântica</title>
+    <title>RAG — Semantic Search</title>
     <style>
       *,
       *::before,
@@ -53,7 +53,7 @@
         gap: 0;
       }
 
-      /* ── Painel Esquerdo ── */
+      /* ── Left Panel ── */
       .sidebar {
         background: #13161f;
         border-right: 1px solid #2d3148;
@@ -212,7 +212,7 @@
         color: #f87171;
       }
 
-      /* ── Painel Direito ── */
+      /* ── Right Panel ── */
       .main {
         display: flex;
         flex-direction: column;
@@ -425,7 +425,7 @@
   </head>
   <body>
     <header>
-      <h1>RAG — Busca Semântica</h1>
+      <h1>RAG — Semantic Search</h1>
       <span>Qdrant + Sentence Transformers</span>
     </header>
 
@@ -436,7 +436,7 @@
         <div>
           <div class="section-title">Collections</div>
           <div id="collections-list" class="collections-list">
-            <div style="font-size: 0.8rem; color: #334155">Carregando...</div>
+            <div style="font-size: 0.8rem; color: #334155">Loading...</div>
           </div>
           <div
             style="
@@ -449,7 +449,7 @@
             <input
               type="text"
               id="new-collection"
-              placeholder="nova-collection"
+              placeholder="new-collection"
               style="flex: 1"
             />
             <button
@@ -464,12 +464,12 @@
 
         <!-- Upload -->
         <div>
-          <div class="section-title">Ingerir Documento</div>
+          <div class="section-title">Ingest Document</div>
           <div class="upload-area" id="upload-area">
             <div class="upload-icon">📄</div>
-            <p>Clique ou arraste um arquivo aqui</p>
+            <p>Click or drag a file here</p>
             <p style="font-size: 0.72rem; color: #475569; margin-top: 0.25rem">
-              PDF, TXT ou MD
+              PDF, TXT or MD
             </p>
             <div class="file-name" id="file-name"></div>
             <input
@@ -480,15 +480,15 @@
             />
           </div>
           <div style="margin-top: 0.75rem">
-            <label>Modo de corte</label>
+            <label>Chunk Mode</label>
             <select id="chunk-mode" onchange="onChunkModeChange(this.value)">
-              <option value="size">Por tamanho (caracteres)</option>
-              <option value="paragraph">Por parágrafos</option>
-              <option value="semantic">Semântico (por similaridade)</option>
+              <option value="size">By size (characters)</option>
+              <option value="paragraph">By paragraphs</option>
+              <option value="semantic">Semantic (by similarity)</option>
             </select>
           </div>
           <div id="max-length-row" style="margin-top: 0.75rem">
-            <label>Tamanho máx. trecho</label>
+            <label>Max chunk size</label>
             <input
               type="number"
               id="max-length"
@@ -502,22 +502,22 @@
             style="margin-top: 0.75rem; display: none"
           >
             <div style="margin-bottom: 0.5rem">
-              <label>Tipo de threshold</label>
+              <label>Threshold Type</label>
               <select id="breakpoint-type">
-                <option value="percentile">Percentil (0–100)</option>
-                <option value="standard_deviation">Desvio padrão</option>
-                <option value="interquartile">Interquartil</option>
+                <option value="percentile">Percentile (0–100)</option>
+                <option value="standard_deviation">Standard Deviation</option>
+                <option value="interquartile">Interquartilee</option>
               </select>
             </div>
             <div>
-              <label>Valor do threshold</label>
+              <label>Threshold Value</label>
               <input
                 type="number"
                 id="breakpoint-amount"
                 value="95"
                 min="0"
                 step="any"
-                title="Percentil: 0–100 | Desvio padrão / Interquartil: valor positivo"
+                title="Percentile: 0–100 | Std Dev / Interquartilee: positive value"
               />
             </div>
           </div>
@@ -536,7 +536,7 @@
               disabled
             >
               <span class="spinner" id="spinner-upload"></span>
-              <span>Ingerir documento</span>
+              <span>Ingest</span>
             </button>
           </div>
           <div
@@ -550,18 +550,18 @@
           ></div>
         </div>
 
-        <!-- Configurações de busca -->
+        <!-- Search Settings -->
         <div>
-          <div class="section-title">Configurações de Busca</div>
-          <label>Top-K trechos</label>
+          <div class="section-title">Search Settings</div>
+          <label>Top-K Chunks</label>
           <input type="number" id="top-k" value="5" min="1" max="20" />
         </div>
 
-        <!-- Remover collection -->
+        <!-- Manage Collection -->
         <div>
-          <div class="section-title">Gerenciar</div>
+          <div class="section-title">Manage</div>
           <button class="btn btn-danger" onclick="deleteCurrentCollection()">
-            Remover collection ativa
+            Delete Active Collection
           </button>
         </div>
       </aside>
@@ -571,7 +571,7 @@
         <div class="query-bar">
           <textarea
             id="question"
-            placeholder="Digite sua pergunta sobre o documento..."
+            placeholder="Ask a question about the document..."
             rows="2"
             onkeydown="
               if (event.key === 'Enter' && !event.shiftKey) {
@@ -582,7 +582,7 @@
           ></textarea>
           <button class="btn btn-primary" id="btn-query" onclick="runQuery()">
             <span class="spinner" id="spinner-query"></span>
-            <span>Buscar</span>
+            <span>Search</span>
           </button>
         </div>
 
@@ -590,8 +590,8 @@
           <div class="empty-state">
             <div class="icon">🔍</div>
             <p>
-              Ingira um PDF na barra lateral e faça uma pergunta para ver os
-              trechos mais relevantes.
+              Ingest a PDF in the sidebar and ask a question to see the most
+              relevant chunks.
             </p>
           </div>
         </div>
@@ -620,7 +620,7 @@
           renderCollections(data.collections || []);
         } catch {
           document.getElementById("collections-list").innerHTML =
-            '<div style="font-size:0.8rem;color:#ef4444">Qdrant inacessível</div>';
+            '<div style="font-size:0.8rem;color:#ef4444">Qdrant unreachable</div>';
         }
       }
 
@@ -628,7 +628,7 @@
         const el = document.getElementById("collections-list");
         if (!cols.length) {
           el.innerHTML =
-            '<div style="font-size:0.8rem;color:#334155">Nenhuma collection ainda.</div>';
+            '<div style="font-size:0.8rem;color:#334155">No collections yet.</div>';
           return;
         }
         el.innerHTML = cols
@@ -636,7 +636,7 @@
             (c) => `
       <div class="col-item ${c === activeCollection ? "active" : ""}" onclick="selectCollection('${c}')">
         <span>📦 ${c}</span>
-        <button class="del-btn" title="Remover" onclick="event.stopPropagation();deleteCollection('${c}')">✕</button>
+        <button class="del-btn" title="Delete" onclick="event.stopPropagation();deleteCollection('${c}')">✕</button>
       </div>`,
           )
           .join("");
@@ -645,7 +645,7 @@
       function selectCollection(name) {
         activeCollection = name;
         loadCollections();
-        toast(`Collection ativa: ${name}`, "info");
+        toast(`Active collection: ${name}`, "info");
       }
 
       function setCollection() {
@@ -653,12 +653,12 @@
         if (val) {
           activeCollection = val;
           loadCollections();
-          toast(`Collection definida: ${val}`, "info");
+          toast(`Collection set: ${val}`, "info");
         }
       }
 
       async function deleteCollection(name) {
-        if (!confirm(`Remover collection "${name}"?`)) return;
+        if (!confirm(`Delete collection "${name}"?`)) return;
         const res = await fetch("/collection", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
@@ -707,14 +707,14 @@
           document.getElementById("file-input").files = e.dataTransfer.files;
           onFileChange(document.getElementById("file-input"));
         } else {
-          toast("Formatos aceitos: PDF, TXT, MD.", "error");
+          toast("Accepted formats: PDF, TXT, MD.", "error");
         }
       });
 
       async function uploadFile() {
         const fileInput = document.getElementById("file-input");
         if (!fileInput.files.length) {
-          toast("Selecione um arquivo PDF.", "error");
+          toast("Select a PDF file.", "error");
           return;
         }
 
@@ -757,15 +757,15 @@
           }
 
           const existNote = data.collection_existed
-            ? " (adicionado à collection existente)"
-            : " (nova collection criada)";
-          const msg = `✅ ${data.chunks} trechos ingeridos na collection "${data.collection}"${existNote}`;
+            ? " (added to existing collection)"
+            : " (new collection created)";
+          const msg = `✅ ${data.chunks} chunks ingested in collection "${data.collection}"${existNote}`;
           document.getElementById("upload-result").textContent = msg;
           document.getElementById("upload-result").style.display = "block";
           toast(msg, "success", 5000);
           loadCollections();
         } catch (e) {
-          toast("Erro na requisição: " + e.message, "error");
+          toast("Request error: " + e.message, "error");
         } finally {
           setBusy("upload", false);
         }
@@ -775,7 +775,7 @@
       async function runQuery() {
         const question = document.getElementById("question").value.trim();
         if (!question) {
-          toast("Digite uma pergunta.", "error");
+          toast("Type a question.", "error");
           return;
         }
 
@@ -800,7 +800,7 @@
           }
           renderResults(data);
         } catch (e) {
-          toast("Erro na requisição: " + e.message, "error");
+          toast("Request error: " + e.message, "error");
         } finally {
           setBusy("query", false);
         }
@@ -815,11 +815,11 @@
             return `
         <div class="chunk-card">
           <div class="chunk-header">
-            <span>Trecho ${i + 1} de ${chunks.length}</span>
+            <span>Chunk ${i + 1} of ${chunks.length}</span>
             <div class="chunk-score">
               <span style="color:#a78bfa;font-weight:600">${pct}%</span>
               <div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>
-              <span>relevância</span>
+              <span>relevance</span>
             </div>
           </div>
           <div class="chunk-body">${escHtml(c.text)}</div>
@@ -829,7 +829,7 @@
 
         el.innerHTML = `
       <div class="result-meta">
-        <span>Pergunta: <strong>${escHtml(question)}</strong></span>
+        <span>Question: <strong>${escHtml(question)}</strong></span>
         <span>Collection: <strong>${escHtml(collection)}</strong></span>
         <span>${chunks.length} trechos encontrados</span>
       </div>

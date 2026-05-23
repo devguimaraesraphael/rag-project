@@ -2,12 +2,12 @@
 set -e
 cd "$(dirname "$0")/.."
 
-echo "Criando ambiente virtual Python..."
+echo "Creating Python virtual environment..."
 python3 -m venv .venv
 
-echo "Instalando dependências do projeto..."
+echo "Installing project dependencies..."
 .venv/bin/pip install -r requirements.txt -q
 
 echo ""
-echo "Dependências instaladas com sucesso!"
-echo "Para ativar o ambiente virtual: source .venv/bin/activate"
+echo "Dependencies installed successfully!"
+echo "To activate the virtual environment: source .venv/bin/activate"
